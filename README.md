@@ -4,6 +4,13 @@ A complete 3D racing game in **one HTML file** — procedural highway, dynamic w
 
 ![Voxel Racing](screenshots/01-storm-night.jpg)
 
+## Download
+
+| Platform | How |
+|---|---|
+| **Android** | [Download VoxelRacing.apk](https://github.com/technicalnihilist-lgtm/Voxel-Racing/releases/latest/download/VoxelRacing.apk) — Android 5.0+ |
+| **Browser** | Open `index.html` — no install, no server |
+
 ## Screenshots
 
 All captured in-game at **1920×1080, Ultra quality**, landscape.
@@ -43,7 +50,7 @@ All captured in-game at **1920×1080, Ultra quality**, landscape.
 
 **Browser** — open `index.html`. That's it.
 
-**Android** — install `apk/VoxelRacing.apk` (Android 5.0+, signed, works offline). You'll need to allow "Install unknown apps" for your file manager, since it is self-signed.
+**Android** — [**⬇ Download the APK**](https://github.com/technicalnihilist-lgtm/Voxel-Racing/releases/latest/download/VoxelRacing.apk) (Android 5.0+, signed, works fully offline), or grab `apk/VoxelRacing.apk` straight from the repo. You'll need to allow "Install unknown apps" for your file manager, since the build is self-signed.
 
 ## Controls
 
