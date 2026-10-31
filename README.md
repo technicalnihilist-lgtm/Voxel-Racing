@@ -2,7 +2,7 @@
 
 A complete 3D racing game in **one HTML file** — procedural highway, dynamic weather, day/night cycle, real vehicle physics and post-processed rendering. No build step, no server, no internet required. Runs in the browser and ships as an Android APK.
 
-![Voxel Racing](screenshots/01-storm-night.png)
+![Voxel Racing](screenshots/01-storm-night.jpg)
 
 ## Screenshots
 
@@ -10,9 +10,9 @@ All captured in-game at **1920×1080, Ultra quality**, landscape.
 
 | | |
 |---|---|
-| ![Storm at night](screenshots/01-storm-night.png) **Storm · Night** — lightning, wet reflective tarmac, lit windows | ![Rain at dusk](screenshots/02-rain-dusk.png) **Rain · Dusk** — rain streaks, spray, glowing street lamps |
-| ![Fog at dawn](screenshots/03-fog-dawn.png) **Fog · Dawn** — headlights cutting through the mist | ![Snow at dawn](screenshots/04-snow-dawn.png) **Snow · Dawn** — falling snow, low-grip surface |
-| ![Clear dusk](screenshots/05-clear-dusk.png) **Clear · Dusk** — golden hour on the highway | ![Hood cam](screenshots/06-hood-cam.png) **Hood cam** — 140 km/h, 78° FOV |
+| ![Storm at night](screenshots/01-storm-night.jpg) **Storm · Night** — lightning, wet reflective tarmac, lit windows | ![Rain at dusk](screenshots/02-rain-dusk.jpg) **Rain · Dusk** — rain streaks, spray, glowing street lamps |
+| ![Fog at dawn](screenshots/03-fog-dawn.jpg) **Fog · Dawn** — headlights cutting through the mist | ![Snow at dawn](screenshots/04-snow-dawn.jpg) **Snow · Dawn** — falling snow, low-grip surface |
+| ![Clear dusk](screenshots/05-clear-dusk.jpg) **Clear · Dusk** — golden hour on the highway | ![Hood cam](screenshots/06-hood-cam.jpg) **Hood cam** — 140 km/h, 78° FOV |
 
 ## Features
 
