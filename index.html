@@ -1182,7 +1182,8 @@ function loop(ts){
  if(car.tail)car.tail.emissiveIntensity=braking?2.6:.2+ (WV.wet>.4?.5:0);
  if(car.glass)car.glass.opacity=.5+ (1-dayF)*.18;
 
- gnd.position.set(Math.round(P.x/8)*8,0,Math.round(P.z/8)*8);
+ /* the ground plane is 1600 units with 160 texture tiles, i.e. one tile = 10 units; snap to whole tiles so the grass pattern stays world-locked instead of jumping 0.8 of a tile every 8 m */
+ gnd.position.set(Math.round(P.x/10)*10,0,Math.round(P.z/10)*10);
 
  /* sky + lights */
  updateSky(dt);

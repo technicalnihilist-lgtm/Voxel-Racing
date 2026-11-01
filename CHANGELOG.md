@@ -15,4 +15,5 @@ Every item is a bug fix, a performance optimisation or a fluidity improvement.
 - Default quality raised to High; adaptive resolution floored at 85% so the image never goes blurry.
 
 ## 2026-11-01
+- Ground plane snapped on an 8-unit grid while its grass texture tiles every 10 units, so the grass pattern jumped 0.8 of a tile every 8 m of travel — a visible shimmer/pop under the car. The ground now snaps on whole 10-unit tiles, which makes each jump an exact tile and the pattern world-locked (no pop).
 <!-- scheduled runs append below this line -->
