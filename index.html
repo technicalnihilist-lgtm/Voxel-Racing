@@ -899,7 +899,7 @@ function treeHit(){
   var o=q2?2.4:-2.4,px=P.x+fx*o,pz=P.z+fz*o,k0=Math.floor(pz/4);
   for(var k=k0-1;k<=k0+1;k++)for(var s=-1;s<=1;s+=2){
    if(H(k,s+7)>=td)continue;
-   var dx=px-(cx(k*4)+s*(11+H(k,s+3)*25)),dz=pz-k*4,d=Math.hypot(dx,dz);
+   var dx=px-(cx(k*4)+s*(14+H(k,s+3)*25)),dz=pz-k*4,d=Math.hypot(dx,dz);
    if(d<2.1&&d>.01){
     var nx=dx/d,nz=dz/d,pen=2.1-d;
     P.x+=nx*pen;P.z+=nz*pen;

@@ -16,4 +16,5 @@ Every item is a bug fix, a performance optimisation or a fluidity improvement.
 
 ## 2026-11-01
 - Ground plane snapped on an 8-unit grid while its grass texture tiles every 10 units, so the grass pattern jumped 0.8 of a tile every 8 m of travel — a visible shimmer/pop under the car. The ground now snaps on whole 10-unit tiles, which makes each jump an exact tile and the pattern world-locked (no pop).
+- Tree collision boxes sat 3 m inside the trees they belonged to: the scenery places a tree at `14 + rand*25` units from the centre line, but the collision test used `11 + rand*25`, so every tree was an invisible obstacle a few metres nearer the road and could be driven straight through at its real position. The collision query now uses the same offset as the renderer, so you hit exactly the trunk you can see.
 <!-- scheduled runs append below this line -->
