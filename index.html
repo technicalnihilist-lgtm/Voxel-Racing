@@ -440,8 +440,23 @@ var BG1=(function(){
  g.computeVertexNormals();return g;
 })();
 var GG1=(function(){var s=new T.Shape();s.moveTo(-1.2,.8);s.lineTo(-.6,1);s.quadraticCurveTo(-.2,1.12,.2,1.1);s.quadraticCurveTo(.55,1.07,.95,.82);s.lineTo(-1.2,.8);return fin(new T.ExtrudeGeometry(s,{depth:1.35,bevelEnabled:true,bevelThickness:.08,bevelSize:.05,bevelSegments:2,curveSegments:10}),1.35)})();
+/* a car model owns the geometries/materials it creates, but reuses a handful of
+   module-level ones shared with the traffic cars; anything else has to be released
+   when a model is discarded or the GPU buffers leak for the rest of the session */
+var CARGEOM=[BG,GG,BG1,GG1,gTire,gRim,gSp,gDisc,gCal,gEx,gSh];
+var CARMAT=[mTire,mSh,mPlate];
+function dropCar(o,mats){
+ if(!o)return;
+ o.traverse(function(n){
+  if(n.geometry&&CARGEOM.indexOf(n.geometry)<0)n.geometry.dispose();
+  if(mats&&n.material){
+   var ms=Array.isArray(n.material)?n.material:[n.material];
+   for(var i=0;i<ms.length;i++)if(CARMAT.indexOf(ms[i])<0)ms[i].dispose();
+  }
+ });
+}
 function mkP1(col,pl,gtr){
- var g=mkCar(col,pl),b=g.b;b.clear();
+ var g=mkCar(col,pl),b=g.b;dropCar(b,false);b.clear();
  var bm=g.m,head=g.head,tail=g.tail,glm=g.glass;
  var dk=new T.MeshStandardMaterial({color:0x0b0b0d,metalness:.4,roughness:.5});
  var cf=new T.MeshStandardMaterial({color:0x17181c,metalness:.32,roughness:.4});
@@ -838,7 +853,8 @@ $('tmb').onclick=function(){mblurOn=mblurOn?0:1;this.classList.toggle('sel',!!mb
 
 var curCar=1;
 function setCar(idx){
- curCar=idx;S.remove(car);
+ curCar=idx;
+ if(car){dropCar(car,true);S.remove(car)}
  var o=[0xc0161b,0xff7a00,0xf5c000,0x0d0d10][idx];
  car=idx?mkP1(o,1,idx===3):mkCar(o,1);
  S.add(car);
