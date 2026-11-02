@@ -1038,6 +1038,10 @@ var cdT=0,cdStep=-1,cdStart=0;
 function newGame(){
  P.z=0;P.x=cx(0);P.h=ang(0);P.vx=P.vz=P.r=0;
  gear=0;tt=0;cz=800;cps=0;ch=P.h;shiftT=0;spin=0;shake=0;skidI=0;skidDist=0;
+ /* the skid ring buffer is rewound but its matrices still hold last race's marks,
+    so those quads stayed on the road for the rest of the session; clear them all */
+ for(var sk=0;sk<SKIDN;sk++)skid.setMatrixAt(sk,ZM);
+ skid.instanceMatrix.needsUpdate=true;
  for(var i=0;i<TR.length;i++)spawn(TR[i]);
  curK=Math.floor(P.z/4);rebuild(curK);cdT=0;cdStep=-1;cdStart=0;state='count';
  I.l=I.r=I.g=I.b=I.rv=0;
