@@ -1048,6 +1048,13 @@ var cdT=0,cdStep=-1,cdStart=0;
 function newGame(){
  P.z=0;P.x=cx(0);P.h=ang(0);P.vx=P.vz=P.r=0;
  gear=0;tt=0;cz=800;cps=0;ch=P.h;shiftT=0;spin=0;shake=0;skidI=0;skidDist=0;
+ /* the countdown never calls step(), so every derived bit of state kept the
+    value it had at the moment of the restart: the speedometer and gear readout
+    still showed the old race's speed, and the body roll/pitch springs and the
+    steering angle still had the car tilted with its front wheels turned until
+    the lights went out. Start the new race from a settled car instead. */
+ vfS=0;slip=0;thr=0;braking=0;dlt=0;st=0;th=0;onRoad=1;offRoad=0;hcool=0;lastA=0;
+ axB=0;ayB=0;pp=0;pv=0;rp=0;rv=0;bp=0;bv=0;
  /* the skid ring buffer is rewound but its matrices still hold last race's marks,
     so those quads stayed on the road for the rest of the session; clear them all */
  for(var sk=0;sk<SKIDN;sk++)skid.setMatrixAt(sk,ZM);
