@@ -361,6 +361,16 @@ function rebuild(kp){
 var gTire=new T.LatheGeometry([[.27,-.15],[.38,-.16],[.41,-.1],[.41,.1],[.38,.16],[.27,.15]].map(function(a){return new T.Vector2(a[0],a[1])}),18).rotateZ(Math.PI/2);
 var gRim=new T.CylinderGeometry(.27,.27,.34,14,1,true).rotateZ(Math.PI/2);
 var gSp=new T.BoxGeometry(.36,.05,.5);
+/* the five spokes of a wheel were five separate meshes per wheel, i.e. 20 draw
+   calls per car just for spokes; one merged geometry per wheel is visually
+   identical and drops 16 draw calls from every car, player and traffic alike */
+var gSpokes=(function(){
+ var l=[];
+ for(var sp=0;sp<5;sp++)l.push(new T.BoxGeometry(.36,.05,.5).rotateX(sp*Math.PI/5));
+ var r=mg(l);
+ for(var i=0;i<l.length;i++)l[i].dispose();
+ return r;
+})();
 var gDisc=new T.CylinderGeometry(.23,.23,.03,16).rotateZ(Math.PI/2);
 var gCal=new T.BoxGeometry(.08,.14,.2);
 var gEx=new T.CylinderGeometry(.07,.07,.2,10).rotateX(Math.PI/2);
@@ -417,7 +427,7 @@ function mkCar(col,pl){
   var p=new T.Group(),w=new T.Group();
   w.add(new T.Mesh(gTire,mTire),new T.Mesh(gRim,rm));
   var dc=new T.Mesh(gDisc,dk);dc.position.x=-x2*.09;w.add(dc);
-  for(var sp=0;sp<5;sp++){var sm=new T.Mesh(gSp,rm);sm.rotation.x=sp*Math.PI/5;w.add(sm)}
+  w.add(new T.Mesh(gSpokes,rm));
   p.position.set(x2*.98,.4,z2);p.add(w);
   var cal=new T.Mesh(gCal,new T.MeshStandardMaterial({color:0xcc1111,roughness:.5}));cal.position.set(-x2*.09,.16,.12);p.add(cal);
   g.add(p);g.w.push(w);if(z2>0)g.f.push(p);
@@ -443,7 +453,7 @@ var GG1=(function(){var s=new T.Shape();s.moveTo(-1.2,.8);s.lineTo(-.6,1);s.quad
 /* a car model owns the geometries/materials it creates, but reuses a handful of
    module-level ones shared with the traffic cars; anything else has to be released
    when a model is discarded or the GPU buffers leak for the rest of the session */
-var CARGEOM=[BG,GG,BG1,GG1,gTire,gRim,gSp,gDisc,gCal,gEx,gSh];
+var CARGEOM=[BG,GG,BG1,GG1,gTire,gRim,gSp,gSpokes,gDisc,gCal,gEx,gSh];
 var CARMAT=[mTire,mSh,mPlate];
 function dropCar(o,mats){
  if(!o)return;
