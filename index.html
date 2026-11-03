@@ -364,7 +364,13 @@ function rebuild(kp){
    put(lamp,li,x+12.2*ca,5.4,z-12.2*sa,1,1,1,a);
    li++;
   }
-  if(H(k,11)<.3){var h3=H(k,13);put(rock,i,x+(H(k,12)<.5?-1:1)*(8+h3*10),.4,z,1+h3*2,.8+h3,1+h3*2,h3*3)}else rock.setMatrixAt(i,ZM);
+  /* the scenery rocks were laid 8-18 m from the centre line, so nearly half of them
+     landed on the paved shoulder inside the 11.4 m guardrail - well within reach of a
+     car the rail clamps to 9.9 m - and rocks, unlike trees, have no collision test at
+     all, so you drove straight through a boulder sitting on the tarmac verge. They now
+     start at the 14 m the trees use, i.e. beyond the rail: 13.5 m at the nearest edge,
+     clear of the car's 11.5 m reach. */
+  if(H(k,11)<.3){var h3=H(k,13);put(rock,i,x+(H(k,12)<.5?-1:1)*(14+h3*10),.4,z,1+h3*2,.8+h3,1+h3*2,h3*3)}else rock.setMatrixAt(i,ZM);
  }
  road.count=n;dash.count=n;edge.count=sho.count=post.count=refl.count=rail.count=trunk.count=leaf.count=pine.count=2*n;
  rock.count=n;bld.count=bi;mtn.count=mi;pole.count=lamp.count=li;
