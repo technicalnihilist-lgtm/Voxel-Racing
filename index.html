@@ -1130,7 +1130,10 @@ function loop(ts){
  if(WV.thunder>.55&&Math.random()<dt*.14){flashT=.45;setTimeout(thunder,600+Math.random()*900)}
  if(flashT>0)flashT=Math.max(0,flashT-dt*1.8);
 
- if(state==='play'||state==='count')tt+=dt;
+ /* the standing-start countdown is not race time: step() never runs during it, so
+    the clock must not run either or the HUD showed 0:03.0 the instant the lights
+    went out and every checkpoint time was inflated by the three-second wait */
+ if(state==='play')tt+=dt;
 
  if(state==='count'){
   if(!cdStart)cdStart=ts;
