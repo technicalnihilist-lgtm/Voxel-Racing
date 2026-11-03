@@ -457,8 +457,14 @@ function mkCar(col,pl){
   var sl=new T.SpotLight(0xfff0d0,0,120,.52,.55,1.2);
   sl.position.set(0,.85,2.2);sl.target.position.set(0,0,42);
   g.add(sl,sl.target);g.sl=sl;
+  /* the volumetric headlight cones are only ever driven for the player's car:
+     updateSky() writes car.beamMat.uOp, and nothing else touches uOp, so a
+     traffic car's two cones sit at alpha 0 for the whole session and were still
+     submitted every frame - 14 additive, depthWrite-off draw calls on a High
+     scene of 7 traffic cars, all of them provably invisible. Only the player
+     gets them now; the rendered image is unchanged. */
+  addBeams(g);
  }
- addBeams(g);
  g.b=b;g.scale.setScalar(1.5);
  return g;
 }
