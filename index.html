@@ -1163,7 +1163,10 @@ function loop(ts){
    if(t.z<P.z-50||t.z>P.z+480)spawn(t);
    t.g.position.set(cx(t.z)+t.lane,.1,t.z);
    t.g.rotation.y=ang(t.z);
-   t.g.w.forEach(function(m){m.rotation.x+=t.v*dt/.38});
+   /* the traffic wheels are the same .41-radius wheel scaled 1.5 as the player's,
+      so at speed v they must roll at v/.6 - the divisor here was .38, which spun
+      every traffic car's wheels 58% faster than the car was actually moving */
+   t.g.w.forEach(function(m){m.rotation.x+=t.v*dt/.6});
    if(t.g.tail)t.g.tail.emissiveIntensity=.18;
   }
   gate.position.set(cx(cz),0,cz);gate.rotation.y=ang(cz);
