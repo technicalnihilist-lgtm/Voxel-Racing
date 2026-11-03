@@ -85,7 +85,7 @@ var Q={
  low:  {pr:.55,sh:0,   n:70, td:.30,tr:3,post:0,rain:320, aniso:1},
  med:  {pr:.80,sh:1024,n:110,td:.50,tr:5,post:1,rain:700, aniso:2},
  high: {pr:1.0,sh:2048,n:150,td:.66,tr:7,post:1,rain:1200,aniso:4},
- ultra:{pr:Math.min(window.devicePixelRatio||1,2),sh:4096,n:190,td:.76,tr:7,post:1,rain:1700,aniso:8}
+ ultra:{pr:1.25,sh:4096,n:190,td:.76,tr:7,post:1,rain:1700,aniso:8}
 };
 var q=((navigator.deviceMemory||4)<=2||(navigator.hardwareConcurrency||8)<=2)?'low':'high';
 var ad=1,vol=.7,camD=1,bloomOn=1,mblurOn=1,state='menu',camM=0,back='pm';
