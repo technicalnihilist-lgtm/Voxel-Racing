@@ -1219,9 +1219,12 @@ function loop(ts){
    t.g.position.set(cx(t.z)+t.lane,.1,t.z);
    t.g.rotation.y=ang(t.z);
    /* the traffic wheels are the same .41-radius wheel scaled 1.5 as the player's,
-      so at speed v they must roll at v/.6 - the divisor here was .38, which spun
-      every traffic car's wheels 58% faster than the car was actually moving */
-   t.g.w.forEach(function(m){m.rotation.x+=t.v*dt/.6});
+      so they must roll at v/.6 where v is the speed the car is actually covering
+      ground at - that is tv, not the nominal t.v. A car now eases off behind a
+      slower car in its lane, so tv can be far below t.v, and using t.v spun its
+      wheels up to 2.46x the ground speed while it was held up: spokes blurring as
+      if the car were doing 86 km/h while it crawled at 36. */
+   t.g.w.forEach(function(m){m.rotation.x+=tv*dt/.6});
    if(t.g.tail)t.g.tail.emissiveIntensity=.18;
   }
   gate.position.set(cx(cz),0,cz);gate.rotation.y=ang(cz);
