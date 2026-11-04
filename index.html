@@ -1281,8 +1281,15 @@ function loop(ts){
    rainArr[ri*6]=wx2;rainArr[ri*6+1]=wy2;rainArr[ri*6+2]=wz2;
    rainArr[ri*6+3]=wx2+windx*.9;rainArr[ri*6+4]=wy2+len;rainArr[ri*6+5]=wz2;
   }
+  /* the buffer holds the drops for the biggest preset (1700), but only rn of
+     them are live and only those are drawn; needsUpdate re-uploaded the whole
+     40.8 KB every frame anyway - on the Low preset that is 33 KB of the bus
+     spent on drops that are not even in the draw range. Upload just the live
+     prefix (the same floats, in the same order). */
   rainGeo.setDrawRange(0,rn*2);
-  rainGeo.attributes.position.needsUpdate=true;
+  var rAt=rainGeo.attributes.position;
+  rAt.updateRange.offset=0;rAt.updateRange.count=rn*6;
+  rAt.needsUpdate=true;
  }else rainMesh.visible=false;
 
  /* snow */
@@ -1298,7 +1305,9 @@ function loop(ts){
    snowArr[si*3]=P.x+s2.x;snowArr[si*3+1]=s2.y;snowArr[si*3+2]=P.z+s2.z;
   }
   snowGeo.setDrawRange(0,sn);
-  snowGeo.attributes.position.needsUpdate=true;
+  var sAt=snowGeo.attributes.position;
+  sAt.updateRange.offset=0;sAt.updateRange.count=sn*3;
+  sAt.needsUpdate=true;
  }else snowMesh.visible=false;
 
  /* car transform */
