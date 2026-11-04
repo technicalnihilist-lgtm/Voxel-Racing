@@ -1104,7 +1104,17 @@ function step(dt){
    stacked at the world origin through the whole menu and countdown and then
    teleported onto the road at GO. Place the mesh here too, so a spawned car is
    already sitting where it belongs before the lights go out. */
-function spawn(t){t.z=P.z+90+Math.random()*350;t.lane=(Math.random()<.5?-1:1)*3;t.v=10+Math.random()*14;
+function spawn(t){
+ t.v=10+Math.random()*14;
+ /* a car used to be dropped at a random spot even if another car already
+    occupied it, so it appeared inside that car and took a second to pull away */
+ for(var a=0;a<6;a++){
+  t.z=P.z+90+Math.random()*350;t.lane=(Math.random()<.5?-1:1)*3;
+  var ok=1;
+  for(var j=0;j<TR.length;j++){var o=TR[j];if(o===t||!o.g.visible)continue;
+   if(o.lane===t.lane&&Math.abs(o.z-t.z)<9){ok=0;break}}
+  if(ok)break;
+ }
  t.g.position.set(cx(t.z)+t.lane,.1,t.z);t.g.rotation.y=ang(t.z)}
 var cdT=0,cdStep=-1,cdStart=0;
 function newGame(){
@@ -1192,7 +1202,19 @@ function loop(ts){
   var kk=Math.floor(P.z/4);if(kk!==curK)rebuild(kk);
   for(var i=0;i<TR.length;i++){
    var t=TR[i];if(!t.g.visible)continue;
-   t.z+=t.v*dt;
+   /* traffic cars never collide with each other, so a faster car drove straight
+      through a slower one sharing its lane - two cars visibly intersecting on
+      ~7% of play frames. A car now eases off as it closes on the nearest car
+      ahead in its own lane and settles one car length behind it instead of
+      passing through it; it only ever slows down, never moves backwards. */
+   var tv=t.v;
+   for(var tj=0;tj<TR.length;tj++){
+    var o=TR[tj];
+    if(o===t||!o.g.visible||o.lane!==t.lane)continue;
+    var gap=o.z-t.z;
+    if(gap>0&&gap<9){var lv=Math.max(0,o.v+(gap-9)*1.5);if(lv<tv)tv=lv}
+   }
+   t.z+=tv*dt;
    if(t.z<P.z-50||t.z>P.z+480)spawn(t);
    t.g.position.set(cx(t.z)+t.lane,.1,t.z);
    t.g.rotation.y=ang(t.z);
