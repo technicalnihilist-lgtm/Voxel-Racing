@@ -277,7 +277,23 @@ gnd.rotation.x=-Math.PI/2;gnd.receiveShadow=true;S.add(gnd);
 /* ---------------- road / scenery instancing ---------------- */
 var MAXT=200;
 function IM(g,m,n){var o=new T.InstancedMesh(g,m,n);o.frustumCulled=false;S.add(o);return o}
-function upd(m){m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true}
+/* the instance buffers are sized for the heaviest preset (MAXT*2 = 400 slots), but a
+   rebuild only writes - and the mesh only draws - the first `count` of them, and
+   needsUpdate re-uploaded the whole array anyway: 268 KB of bufferSubData on every
+   rebuild, 12-20 times a second, of which the slots past `count` can never reach the
+   screen (on the Low preset that is 140 drawn slots out of 400, so two thirds of the
+   upload was wasted). Upload just the drawn prefix - the same floats, in the same
+   order. */
+function upd(m){
+ var n=m.count*16;
+ if(n>0&&n<m.instanceMatrix.array.length){m.instanceMatrix.updateRange.offset=0;m.instanceMatrix.updateRange.count=n}
+ m.instanceMatrix.needsUpdate=true;
+ if(m.instanceColor){
+  var c=m.count*3;
+  if(c>0&&c<m.instanceColor.array.length){m.instanceColor.updateRange.offset=0;m.instanceColor.updateRange.count=c}
+  m.instanceColor.needsUpdate=true;
+ }
+}
 
 var roadMat=new T.MeshStandardMaterial({map:ASP.c,roughnessMap:ASP.r,bumpMap:ASP.b,bumpScale:.02,metalness:0,roughness:1,color:0xffffff,envMapIntensity:.35});
 var road=IM(new T.BoxGeometry(12,.26,4.6),roadMat,MAXT);road.receiveShadow=true;
