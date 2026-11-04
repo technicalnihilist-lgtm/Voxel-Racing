@@ -561,6 +561,9 @@ var pMat=new T.ShaderMaterial({
 var points=new T.Points(pGeo,pMat);points.frustumCulled=false;points.visible=false;S.add(points);
 var pVX=new Float32Array(PMAX),pVY=new Float32Array(PMAX),pVZ=new Float32Array(PMAX),pLife=new Float32Array(PMAX),pMax=new Float32Array(PMAX),pGrav=new Float32Array(PMAX);
 var pHead=0;
+/* set by emit() when a slot's colour is written; the colour buffer never changes
+   on its own, so it does not need re-uploading with the other three */
+var pColDirty=0;
 /* how many of the PMAX slots are actually alive; spray only exists in the wet,
    dust only off-road and sparks only on a hit, so on most frames nothing is
    alive at all */
@@ -571,6 +574,7 @@ function emit(x,y,z,vx,vy,vz,size,r,gg,bb,life,grav){
  pVX[i]=vx;pVY[i]=vy;pVZ[i]=vz;
  pCol[i*3]=r;pCol[i*3+1]=gg;pCol[i*3+2]=bb;
  pSz[i]=size;pLife[i]=life;pMax[i]=life;pGrav[i]=grav||9;
+ pColDirty=1;
  if(pLive<1)pLive=1;points.visible=true;
 }
 function stepParticles(dt){
@@ -579,7 +583,7 @@ function stepParticles(dt){
     buffers (~19 KB) to the GPU every frame, and the mesh was still drawn with
     every point at zero alpha. Idle is the common case, so bail out instead. */
  if(pLive===0)return;
- var live=0;
+ var live=0,lo=PMAX,hi=-1;
  for(var i=0;i<PMAX;i++){
   if(pLife[i]>0){
    pLife[i]-=dt;
@@ -589,14 +593,32 @@ function stepParticles(dt){
    if(pPos[i*3+1]<0){pPos[i*3+1]=0;pVY[i]*=-.15;pVX[i]*=.7;pVZ[i]*=.7}
    var f=Math.max(0,pLife[i]/pMax[i]);
    pAl[i]=f*.38;pSz[i]+=dt*.9;
-   live++;
+   live++;if(i<lo)lo=i;hi=i;
   }else pAl[i]=0;
  }
  pLive=live;points.visible=live>0;
- pGeo.attributes.position.needsUpdate=true;
- pGeo.attributes.aCol.needsUpdate=true;
- pGeo.attributes.aSz.needsUpdate=true;
- pGeo.attributes.aAl.needsUpdate=true;
+ /* the four particle attributes were re-uploaded in full on every frame that had
+    a single particle alive - 19,200 bytes of bufferSubData for a spray plume of a
+    few dozen points out of the 600 slots - and aCol was pushed every frame even
+    though a particle's colour is written once, in emit(), and never again. Only
+    the live slots are drawn and only they change, so upload just that window
+    (lo..hi, the same floats in the same order) and leave the colour buffer alone
+    unless emit() has written to it. The picture is unchanged: a dead slot inside
+    the window still has alpha 0 and is discarded by the shader. */
+ if(live>0){
+  var at=pGeo.attributes,w=hi-lo+1;
+  pGeo.setDrawRange(lo,w);
+  at.position.updateRange.offset=lo*3;at.position.updateRange.count=w*3;
+  at.aSz.updateRange.offset=lo;at.aSz.updateRange.count=w;
+  at.aAl.updateRange.offset=lo;at.aAl.updateRange.count=w;
+  at.position.needsUpdate=true;
+  at.aSz.needsUpdate=true;
+  at.aAl.needsUpdate=true;
+  if(pColDirty){
+   at.aCol.updateRange.offset=lo*3;at.aCol.updateRange.count=w*3;
+   at.aCol.needsUpdate=true;pColDirty=0;
+  }
+ }
 }
 
 /* ---------------- rain ---------------- */
