@@ -963,7 +963,12 @@ $('snd').onclick=function(){back='pm';show('ps')};
 $('snd2').onclick=function(){back='pp';show('ps')};
 $('ext').onclick=function(){try{window.close()}catch(e){}msg('You can close this tab to exit')};
 $('res').onclick=resume;
-$('rst').onclick=function(){newGame();resume()};
+/* restart used to call resume() straight after newGame(), and resume() forces
+   state='play' - so the countdown newGame() had just set up was thrown away and a
+   restart began with no 3-2-1 and no GO, unlike pressing Play in the main menu.
+   Close the pause panel the same way the Play button does and let newGame() run
+   its standing start. */
+$('rst').onclick=function(){newGame();$('ov').classList.remove('on')};
 $('mm').onclick=function(){state='menu';$('hud').style.display='none';back='pm';show('pm')};
 var backs=document.querySelectorAll('[data-back]');
 for(var i=0;i<backs.length;i++)backs[i].onclick=function(){show(back)};
