@@ -1201,6 +1201,10 @@ function newGame(){
  /* the skid ring buffer is rewound but its matrices still hold last race's marks,
     so those quads stayed on the road for the rest of the session; clear them all */
  for(var sk=0;sk<SKIDN;sk++)skid.setMatrixAt(sk,ZM);
+ /* the clear rewrites all 260 slots, so it must be a full upload - say so, or a
+    partial range left over from a skid event earlier in the same frame would
+    leave last race's marks on the GPU */
+ skid.instanceMatrix.updateRange.offset=0;skid.instanceMatrix.updateRange.count=-1;
  skid.instanceMatrix.needsUpdate=true;
  for(var i=0;i<TR.length;i++)spawn(TR[i]);
  curK=Math.floor(P.z/4);rebuild(curK);cdT=0;cdStep=-1;cdStart=0;state='count';
@@ -1326,13 +1330,25 @@ function loop(ts){
   if(Math.abs(slip)>3.6&&onRoad&&WV.wet<.6&&skidDist>.45){
    skidDist=0;
    var rx2=Math.cos(P.h),rz2=-Math.sin(P.h);
+   /* the ring buffer holds 260 marks, 16.6 KB of instance matrices, and every
+      event rewrites exactly the two slots it lays down - yet needsUpdate pushed
+      the whole array to the GPU: 16,640 bytes of bufferSubData for 128 bytes of
+      new data, ~20 times a second while the tyres are spinning. That was a fifth
+      of all the per-frame buffer traffic in a straight 145 km/h run. Upload only
+      the two slots just written (the same floats, in the same order); the pair is
+      contiguous except on the one event in 260 that straddles the end of the
+      ring, which falls back to the full upload. */
+   var sK0=skidI;
    for(var sdx=-1;sdx<=1;sdx+=2){
     D.position.set(P.x+rx2*sdx*1.45-Math.sin(P.h)*1.55,.135,P.z+rz2*sdx*1.45-Math.cos(P.h)*1.55);
     D.rotation.set(0,P.h,0);D.scale.set(1,1,1);D.updateMatrix();
     skid.setMatrixAt(skidI,D.matrix);
     skidI=(skidI+1)%SKIDN;
    }
-   skid.instanceMatrix.needsUpdate=true;
+   var sKM=skid.instanceMatrix;
+   if(sK0+2<=SKIDN){sKM.updateRange.offset=sK0*16;sKM.updateRange.count=32}
+   else{sKM.updateRange.offset=0;sKM.updateRange.count=-1}
+   sKM.needsUpdate=true;
   }
  }
  stepParticles(dt);
