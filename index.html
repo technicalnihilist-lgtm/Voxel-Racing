@@ -950,8 +950,19 @@ function fs(){
   if(p&&p.then)p.then(lk).catch(function(){});else lk();
  }catch(e){}
 }
-function pause(){if(state!=='play')return;state='pause';back='pp';I.l=I.r=I.g=I.b=I.rv=0;show('pp')}
-function resume(){state='play';big('',0);$('ov').classList.remove('on')}
+/* the countdown is a race state of its own, but pause() only accepted 'play' - so
+   the pause button and Escape did nothing during the 3-2-1, and a tab hidden during
+   it was never paused at all (the countdown runs on wall-clock time, so you came
+   back to a race already running). Pause now also takes the countdown, and resume()
+   pushes cdStart forward by however long the panel was up, so the lights go out
+   after the three seconds rather than the instant you come back. */
+var pausedCount=0;
+function pause(){if(state!=='play'&&state!=='count')return;pausedCount=state==='count'?1:0;state='pause';back='pp';I.l=I.r=I.g=I.b=I.rv=0;show('pp')}
+function resume(){
+ if(pausedCount){cdStart=performance.now()-cdT*1000;cdStep=-1;pausedCount=0;state='count';big('',0)}
+ else{state='play';big('',0)}
+ $('ov').classList.remove('on');
+}
 $('play').onclick=function(){initAudio();fs();newGame();$('ov').classList.remove('on');$('hud').style.display='block'};
 $('gar').onclick=function(){back='pm';show('pg')};
 $('wth').onclick=function(){back='pm';show('pw')};
@@ -1032,7 +1043,7 @@ function setQ(v){
 addEventListener('resize',resizeView);
 document.addEventListener('visibilitychange',function(){
  if(document.hidden){
-  if(state==='play')pause();
+  if(state==='play'||state==='count')pause();
   /* rAF is suspended for a hidden tab, so audio() is never called again and the
      engine, tyre and rain gains keep whatever they held at the moment you left -
      the car went on roaring in the background with the race already paused. Mute
@@ -1195,7 +1206,7 @@ function spawn(t){
 var cdT=0,cdStep=-1,cdStart=0;
 function newGame(){
  P.z=0;P.x=cx(0);P.h=ang(0);P.vx=P.vz=P.r=0;
- gear=0;tt=0;cz=800;cps=0;ch=P.h;shiftT=0;spin=0;shake=0;skidI=0;skidDist=0;
+ gear=0;tt=0;cz=800;cps=0;ch=P.h;shiftT=0;spin=0;shake=0;skidI=0;skidDist=0;pausedCount=0;
  /* the countdown never calls step(), so every derived bit of state kept the
     value it had at the moment of the restart: the speedometer and gear readout
     still showed the old race's speed, and the body roll/pitch springs and the
