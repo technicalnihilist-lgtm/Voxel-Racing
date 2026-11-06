@@ -858,7 +858,7 @@ function updateSky(dt){
 }
 
 /* ---------------- audio ---------------- */
-var AC,eo,eo2,eg,flt,sg,rg,thunderGain;
+var AC,eo,eo2,eg,flt,sg,rg,thunderGain,thunBuf=null;
 function initAudio(){
  if(AC)return;
  try{
@@ -890,11 +890,22 @@ function thud(){
  g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+.28);
  o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+.3);
 }
+/* every lightning strike rebuilt its 1.6-second sample from scratch - 76,800
+   samples, each one a Math.pow call, 300 KB of garbage - on the main thread, at
+   the exact moment the sky flashes: a measured 14 ms stall, i.e. a dropped frame,
+   once every ~7 s in the storm preset, which is already the most expensive
+   weather to draw. The waveform is plain noise under a fixed decay envelope, so
+   shape it once and start a new source on the kept buffer; a slight random
+   playback rate keeps each rumble different, as the fresh noise used to. */
 function thunder(){
  if(!AC)return;
- var b=AC.createBuffer(1,AC.sampleRate*1.6,AC.sampleRate),d=b.getChannelData(0);
- for(var i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.6);
- var s=AC.createBufferSource();s.buffer=b;
+ if(!thunBuf){
+  thunBuf=AC.createBuffer(1,AC.sampleRate*1.6,AC.sampleRate);
+  var d=thunBuf.getChannelData(0);
+  for(var i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.6);
+ }
+ var s=AC.createBufferSource();s.buffer=thunBuf;
+ s.playbackRate.value=.9+Math.random()*.2;
  var f=AC.createBiquadFilter();f.type='lowpass';f.frequency.value=320;
  var g=AC.createGain();g.gain.value=vol*.9;
  s.connect(f);f.connect(g);g.connect(AC.destination);s.start();
