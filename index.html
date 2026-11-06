@@ -1216,7 +1216,19 @@ function step(dt){
       road instead of a shove sideways. Resolve on whichever axis the two boxes
       overlap least; a rear-end (|dz| ~ 6.9) is the z case and is unchanged. */
    if(6.9-Math.abs(dz)<=2.9-Math.abs(dx)){
-    var fx=Math.sin(P.h),fz=Math.cos(P.h),rel=P.vx*fx+P.vz*fz-t.v;
+    /* the impulse below is sized by how fast the player is closing on the car
+       ahead, and that car's speed was read from its *nominal* t.v - the speed it
+       would like to make. Traffic cars now ease off behind a slower car in their
+       own lane, so t.v can be far above the speed a car is really making:
+       rear-ending a car that is itself queued behind a slow one (nominal 40 m/s,
+       actually crawling at 3.5) computed a *negative* closing speed, so the whole
+       impulse was skipped while the position was still snapped back - the player
+       was dragged along behind it at its 3.5 m/s with the speedo still reading
+       108 km/h and the wheels spinning, and no thud or sparks ever fired. Resolve
+       the queue first and size the impulse from the speed the car is really
+       covering ground at - the same tEff() the traffic loop moves it by. */
+    for(var tf=0;tf<TR.length;tf++)TR[tf].effF=0;
+    var fx=Math.sin(P.h),fz=Math.cos(P.h),rel=P.vx*fx+P.vz*fz-tEff(t);
     P.z=t.z+(dz<0?-6.9:6.9);P.x+=dx>0?.3:-.3;
     if((dz<0&&rel>0)||(dz>0&&rel<0)){
      var j=1.2*rel/(1/MASS+1/1200);
