@@ -927,7 +927,15 @@ addEventListener('keydown',function(e){
  if(e.key==='r'||e.key==='R')resetCar();
  if(e.key==='n'||e.key==='N'){var ks=Object.keys(WEATHER);setWeather(ks[(ks.indexOf(wName)+1)%ks.length])}
  if(e.key==='t'||e.key==='T'){var ts=Object.keys(TODS);setTOD(ts[(ts.indexOf(todMode)+1)%ts.length])}
- if(e.key==='p'||e.key==='Escape'){if(state==='play')pause();else if(state==='pause')resume()}
+ /* pause()/resume() already know which states they accept - pause() takes 'play'
+   and 'count', resume() is only meaningful from 'pause' - but this handler used to
+   re-test the state itself and only for 'play'. So the keyboard could not pause the
+   standing start even though the pause button could (the countdown has run on
+   wall-clock time since it was made pausable, so Escape during the 3-2-1 did
+   nothing and the race started without you), and the key was tested for lowercase
+   'p' only while c/r/n/t all accept both cases, so Shift+P did nothing at all.
+   Delegate to pause()/resume() and accept 'P' too; in the menu both still no-op. */
+ if(e.key==='p'||e.key==='P'||e.key==='Escape'){if(state==='pause')resume();else pause()}
 });
 addEventListener('keyup',function(e){var k=KM[e.key.length>1?e.key:e.key.toLowerCase()];if(k)I[k]=0});
 /* a window that loses focus never gets the matching keyup - it goes to whatever
