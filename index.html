@@ -566,7 +566,7 @@ var car=mkCar(0xc0161b,1);S.add(car);
 /* traffic */
 var TR=[];
 var TRCOL=[0x2255cc,0xdddddd,0x222222,0xe0a800,0x2a9d4a,0x8a2be2,0xff7a00];
-for(var i=0;i<7;i++){var t={g:mkCar(TRCOL[i]),z:0,lane:3,v:15};S.add(t.g);TR.push(t)}
+for(var i=0;i<7;i++){var t={g:mkCar(TRCOL[i]),z:0,lane:3,v:15,effF:0,effV:0};S.add(t.g);TR.push(t)}
 
 /* checkpoint gate */
 var gate=new T.Group();
@@ -1222,6 +1222,25 @@ function spawn(t){
   if(ok)break;
  }
  t.g.position.set(cx(t.z)+t.lane,.1,t.z);t.g.rotation.y=ang(t.z)}
+/* a car has to ease off for the speed the car ahead is really making, not the
+   speed it would like to make. The car ahead may itself be held up behind a
+   third car, and reading its nominal v let a three-car queue collapse into the
+   middle one: simulated 10-minute runs still put two cars of a lane closer than
+   their own length (8.4 m) on 2.5-4.3% of frames, down to 0.37 m apart. Resolve
+   the chain forwards - a car only ever looks at cars ahead of it, so it
+   terminates - and memoise the result for the frame. A car still only ever
+   slows down, never moves backwards or teleports. */
+function tEff(t){
+ if(t.effF)return t.effV;
+ t.effF=1;t.effV=t.v;
+ for(var j=0;j<TR.length;j++){
+  var o=TR[j];
+  if(o===t||!o.g.visible||o.lane!==t.lane)continue;
+  var gap=o.z-t.z;
+  if(gap>0&&gap<9){var lv=Math.max(0,tEff(o)+(gap-9)*1.5);if(lv<t.effV)t.effV=lv}
+ }
+ return t.effV;
+}
 var cdT=0,cdStep=-1,cdStart=0;
 function newGame(){
  P.z=0;P.x=cx(0);P.h=ang(0);P.vx=P.vz=P.r=0;
@@ -1310,6 +1329,7 @@ function loop(ts){
  if(state==='play'){
   if(P.z>cz){cps++;msg('Checkpoint '+cps+' · '+fmt(tt));cz+=800}
   var kk=Math.floor(P.z/4);if(kk!==curK)rebuild(kk);
+  for(var i=0;i<TR.length;i++)TR[i].effF=0;
   for(var i=0;i<TR.length;i++){
    var t=TR[i];if(!t.g.visible)continue;
    /* traffic cars never collide with each other, so a faster car drove straight
@@ -1317,13 +1337,7 @@ function loop(ts){
       ~7% of play frames. A car now eases off as it closes on the nearest car
       ahead in its own lane and settles one car length behind it instead of
       passing through it; it only ever slows down, never moves backwards. */
-   var tv=t.v;
-   for(var tj=0;tj<TR.length;tj++){
-    var o=TR[tj];
-    if(o===t||!o.g.visible||o.lane!==t.lane)continue;
-    var gap=o.z-t.z;
-    if(gap>0&&gap<9){var lv=Math.max(0,o.v+(gap-9)*1.5);if(lv<tv)tv=lv}
-   }
+   var tv=tEff(t);
    t.z+=tv*dt;
    if(t.z<P.z-50||t.z>P.z+480)spawn(t);
    t.g.position.set(cx(t.z)+t.lane,.1,t.z);
