@@ -1325,7 +1325,14 @@ function big(s,op){
 
 /* ---------------- loop ---------------- */
 var last=0,fr=0,ft=0,lastA=0;
-function fmt(t){var m=Math.floor(t/60);return m+':'+(t%60).toFixed(1).padStart(4,'0')}
+/* the race clock splits the minutes off before it rounds, so the seconds field is
+   printed at one decimal while the minutes are already truncated: at 59.95 s
+   (t%60).toFixed(1) rounds up to "60.0" and the HUD read 0:60.0 instead of 1:00.0.
+   The HUD refreshes every third frame, ~50 ms, which is exactly the width of that
+   window, so every minute boundary showed a bogus M:60.0 for one refresh. Round to
+   the tenth that is actually displayed first, then split, so the carry goes into
+   the minute like a real clock. */
+function fmt(t){var s=Math.round(t*10)/10,m=Math.floor(s/60);return m+':'+(s-m*60).toFixed(1).padStart(4,'0')}
 function hud(){
  var kmh=Math.abs(vfS)*3.6|0;
  $('sv').textContent=kmh;
