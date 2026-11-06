@@ -1209,16 +1209,36 @@ function step(dt){
   var t=TR[ti];if(!t.g.visible)continue;
   var dx=P.x-t.g.position.x,dz=P.z-t.z;
   if(Math.abs(dx)<2.9&&Math.abs(dz)<6.9){
-   var fx=Math.sin(P.h),fz=Math.cos(P.h),rel=P.vx*fx+P.vz*fz-t.v;
-   P.z=t.z+(dz<0?-6.9:6.9);P.x+=dx>0?.3:-.3;
-   if((dz<0&&rel>0)||(dz>0&&rel<0)){
-    var j=1.2*rel/(1/MASS+1/1200);
-    P.vx-=j/MASS*fx;P.vz-=j/MASS*fz;
-    t.v=Math.max(5,Math.min(45,t.v+j/1200));
-    P.r+=(dx>0?-1:1)*Math.min(1,Math.abs(rel)*.03)*.5;
-    shake=Math.min(1,Math.abs(rel)*.05);
-    if(hcool<=0){thud();hcool=.4}
-    for(var sp=0;sp<10;sp++)emit(P.x+(Math.random()-.5)*2,1+Math.random(),P.z+(Math.random()-.5)*2,(Math.random()-.5)*6,2+Math.random()*4,(Math.random()-.5)*6,.35,1,.8,.4,.6,10);
+   /* the contact box is 5.8 wide by 13.8 long, and every contact used to be
+      pushed out along z - the 13.8 m axis - whatever the overlap was. Passing a
+      car alongside (|dz| ~ 1 m, |dx| ~ 2.7 m) therefore threw the player the
+      full 5.7 m of that axis in a single frame: a teleport straight down the
+      road instead of a shove sideways. Resolve on whichever axis the two boxes
+      overlap least; a rear-end (|dz| ~ 6.9) is the z case and is unchanged. */
+   if(6.9-Math.abs(dz)<=2.9-Math.abs(dx)){
+    var fx=Math.sin(P.h),fz=Math.cos(P.h),rel=P.vx*fx+P.vz*fz-t.v;
+    P.z=t.z+(dz<0?-6.9:6.9);P.x+=dx>0?.3:-.3;
+    if((dz<0&&rel>0)||(dz>0&&rel<0)){
+     var j=1.2*rel/(1/MASS+1/1200);
+     P.vx-=j/MASS*fx;P.vz-=j/MASS*fz;
+     t.v=Math.max(5,Math.min(45,t.v+j/1200));
+     P.r+=(dx>0?-1:1)*Math.min(1,Math.abs(rel)*.03)*.5;
+     shake=Math.min(1,Math.abs(rel)*.05);
+     if(hcool<=0){thud();hcool=.4}
+     for(var sp=0;sp<10;sp++)emit(P.x+(Math.random()-.5)*2,1+Math.random(),P.z+(Math.random()-.5)*2,(Math.random()-.5)*6,2+Math.random()*4,(Math.random()-.5)*6,.35,1,.8,.4,.6,10);
+    }
+   }else{
+    /* side contact: separate across the width axis and cancel the speed that
+       was closing on the other car, so a passing car shrugs you off sideways */
+    var sgx=dx>0?1:-1;
+    P.x=t.g.position.x+sgx*2.9;
+    var lv=P.vx*sgx;
+    if(lv<0){
+     P.vx-=1.05*lv*sgx;
+     P.r-=sgx*Math.min(.5,Math.abs(lv)*.02);
+     shake=Math.min(1,Math.abs(lv)*.05);
+     if(hcool<=0){thud();hcool=.4}
+    }
    }
   }
  }
