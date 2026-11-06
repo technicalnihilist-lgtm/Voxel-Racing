@@ -1349,8 +1349,21 @@ function hud(){
 function loop(ts){
  requestAnimationFrame(loop);
  if(document.hidden)return;
- var dt=Math.min(.05,(ts-last)/1000||.016);last=ts;
- fr++;ft+=dt;
+ /* the adaptive-resolution sampler below measures the frame rate as
+    frames / elapsed, but it summed the *clamped* frame delta (dt is capped at
+    50 ms so a stall cannot explode the physics). Below 20 fps that cap bites:
+    every frame counts as exactly 50 ms, so the measured rate saturates at 20 fps
+    (a device at 10 fps and one at 18 fps both read 20) and the 2.5 s window
+    stretches - at 10 fps it took 5.1 s of real time to fill, at 8 fps 6.4 s - so
+    the one thing that is supposed to help a struggling device reacted half as
+    often and never knew how bad it really was. Sample the true frame interval
+    instead (a single frame is capped at 500 ms so a tab-resume or a long stall
+    cannot poison the window). At 20 fps and above the interval is already under
+    the 50 ms cap, so every measurement and every step is bit-identical to
+    before. */
+ var dtR=(ts-last)/1000;
+ var dt=Math.min(.05,dtR||.016);last=ts;
+ fr++;ft+=Math.min(.5,dtR||.016);
  if(ft>2.5){
   var f=fr/ft;fr=0;ft=0;
   if(f<22&&ad>.85){ad*=.94;resizeView()}
