@@ -761,6 +761,33 @@ var G_TOP=new T.Color(0x3a2a52),G_MID=new T.Color(0xff9a5e),G_BOT=new T.Color(0x
 var GR_TOP=new T.Color(0x4a5360),GR_MID=new T.Color(0x8d97a3),GR_BOT=new T.Color(0x5a6168);
 var cTop=new T.Color(),cMid=new T.Color(),cBot=new T.Color(),cSun=new T.Color(),cTmp=new T.Color();
 var sunDir=new T.Vector3(0,1,0),ldV=new T.Vector3(0,1,0),FLASHC=new T.Color(0xbfd4ff),flashT=0,dayF=1,goldF=0;
+var shX=new T.Vector3(),shY=new T.Vector3(),shZ=new T.Vector3(),shUp=new T.Vector3(0,1,0);
+/* the sun's shadow camera rides with the car, so every frame its shadow-map grid
+   slides with it - by whatever fraction of a texel the car happened to travel.
+   A static piece of scenery therefore lands on a different sub-texel each frame
+   and the depth comparison jumps between them, so every shadow edge in the scene
+   crawls and fizzes as you drive (measured: a fixed world point reads u/v phases
+   scattered over the whole 0..1 texel range frame to frame). Snapping the light
+   and its target - both, so the light direction is untouched - to whole texels of
+   the shadow camera's own axes moves them by at most half a texel (2.3 cm at
+   High) and makes the phase constant, so shadows sit still in the world. */
+function snapShadow(){
+ var sc=sun.shadow.camera,texel=(sc.right-sc.left)/(sun.shadow.mapSize.x||1024);
+ shZ.copy(sun.position).sub(sun.target.position);
+ if(shZ.lengthSq()<1e-8)return;
+ shZ.normalize();
+ shX.crossVectors(shUp,shZ);
+ /* sun exactly overhead: three's lookAt nudges the basis itself, so leave it be */
+ if(shX.lengthSq()<1e-8)return;
+ shX.normalize();shY.crossVectors(shZ,shX);
+ var px=sun.position.dot(shX),py=sun.position.dot(shY);
+ var ox=shX.x*(Math.round(px/texel)*texel-px)+shY.x*(Math.round(py/texel)*texel-py);
+ var oy=shX.y*(Math.round(px/texel)*texel-px)+shY.y*(Math.round(py/texel)*texel-py);
+ var oz=shX.z*(Math.round(px/texel)*texel-px)+shY.z*(Math.round(py/texel)*texel-py);
+ sun.position.x+=ox;sun.position.y+=oy;sun.position.z+=oz;
+ sun.target.position.x+=ox;sun.target.position.y+=oy;sun.target.position.z+=oz;
+ sun.target.updateMatrixWorld();
+}
 var WHITE=new T.Color(0xfff6e6),ORANGE=new T.Color(0xff8a3d),MOON=new T.Color(0x9fb6ff);
 
 function updateSky(dt){
@@ -812,6 +839,7 @@ function updateSky(dt){
  var ld=el>-0.02?sunDir:ldV.set(sunDir.x,-sunDir.y,sunDir.z).normalize();
  sun.position.set(P.x+ld.x*140,Math.max(8,ld.y*140+18),P.z+ld.z*140);
  sun.target.position.set(P.x,0,P.z);sun.target.updateMatrixWorld();
+ snapShadow();
 
  dome.position.copy(C.position);
  dome.scale.setScalar(Math.max(120,farBase*1.15));
