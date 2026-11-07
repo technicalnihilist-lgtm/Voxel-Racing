@@ -951,8 +951,14 @@ function audio(rpm,t,sk){
 
 /* ---------------- input ---------------- */
 var I={l:0,r:0,g:0,b:0,rv:0};
+/* the five on-screen controls that mirror a key; `on` is the pressed look */
+var CEL=[];
+/* the input flags and the pressed look are one state, but every reset of the
+   input (losing focus, pausing, restarting) cleared only the flags: the button
+   stayed lit while the control was dead. Clear both together. */
+function clearInput(){I.l=I.r=I.g=I.b=I.rv=0;for(var i=0;i<CEL.length;i++)CEL[i].classList.remove('on')}
 function bind(id,k){
- var e=$(id);
+ var e=$(id);CEL.push(e);
  e.addEventListener('pointerdown',function(ev){I[k]=1;e.classList.add('on');try{e.setPointerCapture(ev.pointerId)}catch(_){}ev.preventDefault()});
  var u=function(){I[k]=0;e.classList.remove('on')};
  ['pointerup','pointercancel','lostpointercapture'].forEach(function(n){e.addEventListener(n,u)});
@@ -983,7 +989,7 @@ addEventListener('keyup',function(e){var k=KM[e.key.length>1?e.key:e.key.toLower
    engine kept revving) while you were looking at something else. The visibility
    handler only covers a hidden tab, and an alt-tabbed window is not hidden, so
    clear every control when focus leaves; nothing is still held when you return. */
-addEventListener('blur',function(){I.l=I.r=I.g=I.b=I.rv=0});
+addEventListener('blur',clearInput);
 function cycCam(){camM=(camM+1)%3;msg(['Chase camera','Far camera','Cockpit camera'][camM])}
 $('bc').onclick=cycCam;$('br').onclick=resetCar;$('bp').onclick=pause;
 
@@ -1004,7 +1010,7 @@ function fs(){
    pushes cdStart forward by however long the panel was up, so the lights go out
    after the three seconds rather than the instant you come back. */
 var pausedCount=0;
-function pause(){if(state!=='play'&&state!=='count')return;pausedCount=state==='count'?1:0;state='pause';back='pp';I.l=I.r=I.g=I.b=I.rv=0;show('pp')}
+function pause(){if(state!=='play'&&state!=='count')return;pausedCount=state==='count'?1:0;state='pause';back='pp';clearInput();show('pp')}
 function resume(){
  if(pausedCount){cdStart=performance.now()-cdT*1000;cdStep=-1;pausedCount=0;state='count';big('',0)}
  else{state='play';big('',0)}
@@ -1345,7 +1351,7 @@ function newGame(){
  skid.instanceMatrix.needsUpdate=true;
  for(var i=0;i<TR.length;i++)spawn(TR[i]);
  curK=Math.floor(P.z/4);rebuild(curK);cdT=0;cdStep=-1;cdStart=0;state='count';
- I.l=I.r=I.g=I.b=I.rv=0;
+ clearInput();
 }
 function resetCar(){
  var z=P.z;P.x=cx(z);P.h=ang(z);P.vx=P.vz=P.r=0;gear=0;msg('Car reset');
