@@ -1219,12 +1219,21 @@ function step(dt){
   P.vx=u*Math.sin(P.h)+v*Math.cos(P.h);
   P.vz=u*Math.cos(P.h)-v*Math.sin(P.h);
   P.x+=P.vx*h;P.z+=P.vz*h;
-  /* guardrail: hard limit, velocity reflected instead of teleporting */
-  var ofs=P.x-cx(P.z);
+  /* guardrail: hard limit, velocity reflected instead of teleporting. LIM is a
+     distance measured *across* the road, and the road curves: the rail is laid
+     at a constant 11.4 m along each segment's normal, but this test compared the
+     raw world x offset against the centre line, so the wall drifted with the
+     curvature - the car came to rest 9.89 m out on a straight and 8.87 m out at
+     the sharpest bend, ~1 m short of the rail it was supposed to be leaning on,
+     with the thud, the sparks and the shake all firing in mid air. Take the
+     offset across the road (world x offset x cos of the road angle) and put the
+     car back the same way, so the wall sits at LIM everywhere. */
+  var a3=ang(P.z),ca3=Math.cos(a3);
+  var ofs=(P.x-cx(P.z))*ca3;
   if(ofs>LIM||ofs<-LIM){
    var sg5=ofs>0?1:-1;
-   P.x=cx(P.z)+sg5*LIM;
-   var a3=ang(P.z),px3=Math.cos(a3),pz3=-Math.sin(a3);
+   P.x=cx(P.z)+sg5*LIM/ca3;
+   var px3=ca3,pz3=-Math.sin(a3);
    var lt=P.vx*px3+P.vz*pz3;
    if(lt*sg5>0){
     /* cancel only the sideways component, keep rolling along the rail */
@@ -1241,8 +1250,10 @@ function step(dt){
  if(shiftT>0)shiftT-=dt;
  else if(u>.5){if(erpm>7400&&gear<5){gear++;shiftT=.18}else if(erpm<3200&&gear>0){gear--;shiftT=.1}}
  treeHit();
- var off2=P.x-cx(P.z);
- if(Math.abs(off2)>LIM+2){P.x=cx(P.z)+(off2>0?1:-1)*(LIM+2);P.vx*=.5;P.vz*=.7}
+ /* the last-resort clamp is a cross-road distance too - measure it the same way */
+ var a4=ang(P.z),ca4=Math.cos(a4);
+ var off2=(P.x-cx(P.z))*ca4;
+ if(Math.abs(off2)>LIM+2){P.x=cx(P.z)+(off2>0?1:-1)*(LIM+2)/ca4;P.vx*=.5;P.vz*=.7}
  for(var ti=0;ti<TR.length;ti++){
   var t=TR[ti];if(!t.g.visible)continue;
   /* the contact box has to be measured in road space, not in world axes. The
