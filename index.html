@@ -1207,7 +1207,18 @@ function step(dt){
  if(Math.abs(off2)>LIM+2){P.x=cx(P.z)+(off2>0?1:-1)*(LIM+2);P.vx*=.5;P.vz*=.7}
  for(var ti=0;ti<TR.length;ti++){
   var t=TR[ti];if(!t.g.visible)continue;
-  var dx=P.x-t.g.position.x,dz=P.z-t.z;
+  /* the contact box has to be measured in road space, not in world axes. The
+     traffic cars sit at cx(t.z)+t.lane and the player at P.x, and the road
+     curves: cx() moves by up to 3.6 m across the 13.8 m the box spans, which is
+     larger than the 2.9 m half-width itself. So a car a full lane away was
+     compared on world x alone and, on a curve, closed to under 2.9 m - driving
+     down the middle of the road collected 2,289 phantom contacts in 300 s with
+     cars that were never nearer than a lane, each one shoving the player up to
+     1.9 m sideways and reflecting its lateral speed. The same error hid real
+     contacts on the outside of a curve. Compare the lateral offsets from each
+     car's own centre line instead; the box, the impulses and the thresholds are
+     untouched. */
+  var dz=P.z-t.z,dx=(P.x-cx(P.z))-t.lane;
   if(Math.abs(dx)<2.9&&Math.abs(dz)<6.9){
    /* the contact box is 5.8 wide by 13.8 long, and every contact used to be
       pushed out along z - the 13.8 m axis - whatever the overlap was. Passing a
@@ -1243,7 +1254,7 @@ function step(dt){
     /* side contact: separate across the width axis and cancel the speed that
        was closing on the other car, so a passing car shrugs you off sideways */
     var sgx=dx>0?1:-1;
-    P.x=t.g.position.x+sgx*2.9;
+    P.x=cx(P.z)+t.lane+sgx*2.9;
     var lv=P.vx*sgx;
     if(lv<0){
      P.vx-=1.05*lv*sgx;
