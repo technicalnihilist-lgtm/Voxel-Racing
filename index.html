@@ -489,6 +489,17 @@ function mkCar(col,pl){
  var sh=new T.Mesh(gSh,mSh);sh.rotation.x=-Math.PI/2;sh.position.y=.035;g.add(sh);
  g.w=[];g.f=[];
  var AXLES=[-1.4,1.4];
+ /* a traffic car's brake calipers were four separate meshes, each with its own
+    freshly built (but identical) red material, i.e. four draw submissions and
+    four materials for four boxes that never move relative to the car - a
+    traffic car's hub groups are never rotated by anything (only the player's
+    front pair steers, in car.f), so the four are one rigid part. Merge them into
+    a single mesh for the traffic cars (same boxes, same transforms, same
+    material, castShadow still off): 7 traffic cars fall from 182 to 161 draw
+    calls a frame. The player keeps four separate meshes because its front pair
+    has to turn with the steering, but they now share one material instead of
+    four. */
+ var calMat=new T.MeshStandardMaterial({color:0xcc1111,roughness:.5}),calG=pl?null:[];
  for(var ai=0;ai<AXLES.length;ai++){
   var z2=AXLES[ai];
   for(var x2=-1;x2<=1;x2+=2){
@@ -496,9 +507,18 @@ function mkCar(col,pl){
   w.add(new T.Mesh(gTire,mTire),new T.Mesh(gRimSpokes,rm));
   var dc=new T.Mesh(gDisc,dk);dc.position.x=-x2*.09;w.add(dc);
   p.position.set(x2*.98,.4,z2);p.add(w);
-  var cal=new T.Mesh(gCal,new T.MeshStandardMaterial({color:0xcc1111,roughness:.5}));cal.position.set(-x2*.09,.16,.12);p.add(cal);
+  if(pl){
+   var cal=new T.Mesh(gCal,calMat);cal.position.set(-x2*.09,.16,.12);p.add(cal);
+  }else{
+   var cg=gCal.clone();cg.translate(x2*.98-x2*.09,.4+.16,z2+.12);calG.push(cg);
+  }
   g.add(p);g.w.push(w);if(z2>0)g.f.push(p);
   }
+ }
+ if(calG){
+  var cm=new T.Mesh(mg(calG),calMat);
+  for(var cgi=0;cgi<calG.length;cgi++)calG[cgi].dispose();
+  g.add(cm);
  }
  if(pl){
   var sl=new T.SpotLight(0xfff0d0,0,120,.52,.55,1.2);
