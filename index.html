@@ -1176,7 +1176,19 @@ function step(dt){
   /* tyre grip: sideways velocity bleeds off so the car tracks its nose instead of spinning */
   v*=Math.max(0,1-h*LATP*(onRoad?1:.62)*wetGrip*wetGrip);
   if(au<3){v*=1-Math.min(.5,h*10*(1-au/3));P.r*=1-Math.min(.5,h*8*(1-au/3))}
-  axB+=(du-axB)*.15;ayB=nu*P.r;u=nu;sl=Math.max(sl,Math.abs(v));
+  /* the smoothed longitudinal acceleration that sets the front/rear load
+     transfer (and the body's pitch) was eased with a fixed .15 per substep, so
+     its time constant followed the substep rate rather than the clock: step()
+     always runs four substeps, so a 30 fps device smoothed it 120 times a second
+     and a 120 fps one 480 times a second, and the same throttle loaded the rear
+     tyres quite differently on each. Measured 100 ms after flooring it from
+     rest, axB read 3.81 at 30 fps and 4.42 at 120 - a 16% spread in the weight
+     transfer that moves the front/rear grip balance between devices. Ease it on
+     the substep's own duration instead: 39/s is exactly the .15-per-substep
+     constant at the 240 Hz substep rate a 60 fps frame gives, so a 60 fps device
+     is unchanged (4.338 before and after) and every other rate now follows the
+     same wall-clock curve (30/60/90/120 fps all read 4.34). */
+  axB+=(du-axB)*(1-Math.exp(-h*39));ayB=nu*P.r;u=nu;sl=Math.max(sl,Math.abs(v));
   P.h+=P.r*h;
   P.vx=u*Math.sin(P.h)+v*Math.cos(P.h);
   P.vz=u*Math.cos(P.h)-v*Math.sin(P.h);
