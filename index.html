@@ -104,11 +104,20 @@ S.background=new T.Color(0x8ec5ff);
 
 /* ---------------- canvas texture helpers ---------------- */
 function cv(w,h){var k=document.createElement('canvas');k.width=w;k.height=h;return k}
+/* the four tiled textures (asphalt colour, roughness, bump, grass) are built
+   once at load, when the anisotropy of the *auto-detected* preset is baked into
+   them - and Q[].aniso was never read again. So the Graphics menu's Low preset
+   left 4x anisotropic filtering running on the one device class that needs it
+   gone, and Ultra could not raise it to 8x: the field only ever took effect for
+   whichever preset the device happened to boot with. Keep the textures and
+   re-apply the filter when the preset changes. */
+var TEXS=[];
 function ctex(k,rep,srgb){
  var t=new T.CanvasTexture(k);
  t.wrapS=t.wrapT=T.RepeatWrapping;
  if(rep)t.repeat.set(rep,rep);
  t.anisotropy=Math.min(Q[q].aniso,R.capabilities.getMaxAnisotropy());
+ TEXS.push(t);
  if(srgb)t.encoding=T.sRGBEncoding;
  return t;
 }
@@ -1110,6 +1119,14 @@ function resizeView(){
 function setQ(v){
  q=v;ad=1;
  var c=Q[q];
+ /* a sampler parameter is only applied when the texture is uploaded, so the
+    ones that actually change need a re-upload; on the boot call the preset is
+    the one the textures were built for, so every value already matches and
+    nothing is re-sent. */
+ var an=Math.min(c.aniso,R.capabilities.getMaxAnisotropy());
+ for(var ti=0;ti<TEXS.length;ti++){
+  if(TEXS[ti].anisotropy!==an){TEXS[ti].anisotropy=an;TEXS[ti].needsUpdate=true}
+ }
  sun.castShadow=c.sh>0;
  if(c.sh>0){
   sun.shadow.mapSize.set(c.sh,c.sh);
