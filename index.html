@@ -1169,7 +1169,19 @@ function step(dt){
  for(var n=0;n<N;n++){
   u=P.vx*Math.sin(P.h)+P.vz*Math.cos(P.h);
   var v=P.vx*Math.cos(P.h)-P.vz*Math.sin(P.h);
-  var off=P.x-cx(P.z);
+  /* the on-road test was the last measurement in the physics still taken in
+     world axes on a road that curves. The tarmac is a 12 m box laid along each
+     segment's normal, so its edge sits a constant 6 m *across* the road, but
+     this compared the raw world-x offset against the centre line: on the
+     sharpest bend (29.1 deg) the 6.5 m threshold is only 6.5*cos(29.1) = 5.68 m
+     across, so the boundary slid 0.82 m inside the paved edge and a car still on
+     the tarmac was declared off-road - mu falls 1.25 -> 0.92 (-26%), steering
+     authority x0.62, rolling resistance 0.015 -> 0.06, plus dust and the
+     suspension bump - while the same 5.8 m out on a straight is on-road. 8.8% of
+     the first 20 km of track had the boundary inside the tarmac. Take the offset
+     across the road, the way the guardrail and the contact box already are; the
+     threshold, the grip numbers and the geometry are untouched. */
+  var off=(P.x-cx(P.z))*Math.cos(ang(P.z));
   onRoad=Math.abs(off)<6.5?1:0;
   var mu=(onRoad?1.25:.92)*wetGrip;
   var au=Math.abs(u),us=Math.max(2,au),sg2=u<0?-1:1;
