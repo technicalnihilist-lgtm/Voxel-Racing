@@ -339,8 +339,17 @@ var D=new T.Object3D(),ZM=new T.Matrix4().makeScale(0,0,0),cl=new T.Color();
    element-for-element) for a third less CPU: rebuild() falls from ~0.70 ms to
    ~0.46 ms at High, and it is the heaviest thing the main thread does during a
    race, 12-20 times a second. */
-function put(m,i,x,y,z,sx,sy,sz,ry){
- var a=ry||0,c=Math.cos(a),s=Math.sin(a),e=m.instanceMatrix.array,b=i*16;
+/* rebuild() already holds the cosine and sine of the segment's road angle - it
+   needs them for the lateral offsets - yet put() took the angle and recomputed
+   the same pair for every one of the 2,311 matrices it composes per rebuild:
+   4,622 trig calls where 150 pairs are enough, on the heaviest thing the main
+   thread does during a race. Take the pair instead of the angle. Every caller
+   passes the same doubles it used to (the zero-rotation props pass 1 and 0,
+   exactly what Math.cos(0)/Math.sin(0) returned), so the instance data is
+   bit-identical; only the work of recomputing it is gone. */
+var C45=Math.cos(Math.PI/4),S45=Math.sin(Math.PI/4);
+function put(m,i,x,y,z,sx,sy,sz,c,s){
+ var e=m.instanceMatrix.array,b=i*16;
  e[b]=c*sx;e[b+1]=0;e[b+2]=-s*sx;e[b+3]=0;
  e[b+4]=0;e[b+5]=sy;e[b+6]=0;e[b+7]=0;
  e[b+8]=s*sz;e[b+9]=0;e[b+10]=c*sz;e[b+11]=0;
@@ -352,32 +361,32 @@ function rebuild(kp){
  curK=kp;var n=Q[q].n,td=Q[q].td,bi=0,mi=0,li=0;
  for(var i=0;i<n;i++){
   var k=kp-8+i,z=k*4,x=cx(z),a=ang(z),ca=Math.cos(a),sa=Math.sin(a);
-  put(road,i,x,0,z,1,1,1,a);
+  put(road,i,x,0,z,1,1,1,ca,sa);
   cl.setScalar(.9+H(k,21)*.2);road.setColorAt(i,cl);
-  if(k%2===0)put(dash,i,x,.14,z,1,1,1,a);else dash.setMatrixAt(i,ZM);
+  if(k%2===0)put(dash,i,x,.14,z,1,1,1,ca,sa);else dash.setMatrixAt(i,ZM);
   for(var s=-1;s<=1;s+=2){
    var j=i*2+(s>0?1:0);
-   put(edge,j,x+s*5.5*ca,.14,z-s*5.5*sa,1,1,1,a);
-   put(sho,j,x+s*9*ca,-.05,z-s*9*sa,1,1,1,a);
-   put(rail,j,x+s*11.4*ca,.68,z-s*11.4*sa,1,1,1,a);
-   put(post,j,x+s*11.4*ca,.4,z-s*11.4*sa,1,1,1,a);
-   put(refl,j,x+s*11.3*ca,.72,z-s*11.3*sa,1,1,1,a);
+   put(edge,j,x+s*5.5*ca,.14,z-s*5.5*sa,1,1,1,ca,sa);
+   put(sho,j,x+s*9*ca,-.05,z-s*9*sa,1,1,1,ca,sa);
+   put(rail,j,x+s*11.4*ca,.68,z-s*11.4*sa,1,1,1,ca,sa);
+   put(post,j,x+s*11.4*ca,.4,z-s*11.4*sa,1,1,1,ca,sa);
+   put(refl,j,x+s*11.3*ca,.72,z-s*11.3*sa,1,1,1,ca,sa);
    var h=H(k,s+3);
    if(H(k,s+7)<td){
     var o=14+h*25,tx=x+s*o,hh=H(k,s+9),pn=hh<.45,sc=.9+hh*.7;
-    put(trunk,j,tx,0,z,sc,sc,sc);
-    if(pn){put(pine,j,tx,0,z,sc,sc,sc);leaf.setMatrixAt(j,ZM);cl.setHSL(.35,.42,.13+h*.07);pine.setColorAt(j,cl);leaf.setColorAt(j,cl)}
-    else{put(leaf,j,tx,0,z,sc,sc,sc);pine.setMatrixAt(j,ZM);cl.setHSL(.23+hh*.08,.42,.15+h*.12);leaf.setColorAt(j,cl);pine.setColorAt(j,cl)}
+    put(trunk,j,tx,0,z,sc,sc,sc,1,0);
+    if(pn){put(pine,j,tx,0,z,sc,sc,sc,1,0);leaf.setMatrixAt(j,ZM);cl.setHSL(.35,.42,.13+h*.07);pine.setColorAt(j,cl);leaf.setColorAt(j,cl)}
+    else{put(leaf,j,tx,0,z,sc,sc,sc,1,0);pine.setMatrixAt(j,ZM);cl.setHSL(.23+hh*.08,.42,.15+h*.12);leaf.setColorAt(j,cl);pine.setColorAt(j,cl)}
    }else{
     trunk.setMatrixAt(j,ZM);leaf.setMatrixAt(j,ZM);pine.setMatrixAt(j,ZM);
     cl.setHex(0x000000);leaf.setColorAt(j,cl);pine.setColorAt(j,cl);
    }
-   if(k%6===0&&bi<80){var w=8+h*8,ht=8+H(k,s+5)*28;put(bld,bi,x+s*(26+h*22),ht/2,z,w,ht,w,0);cl.setHSL(.6,.04,.42+h*.32);bld.setColorAt(bi++,cl)}
-   if(k%10===0&&mi<40){var rr=60+h*60,ht2=40+H(k,s+2)*60;put(mtn,mi++,x+s*(150+h*110),ht2/2,z,rr,ht2,rr,Math.PI/4)}
+   if(k%6===0&&bi<80){var w=8+h*8,ht=8+H(k,s+5)*28;put(bld,bi,x+s*(26+h*22),ht/2,z,w,ht,w,1,0);cl.setHSL(.6,.04,.42+h*.32);bld.setColorAt(bi++,cl)}
+   if(k%10===0&&mi<40){var rr=60+h*60,ht2=40+H(k,s+2)*60;put(mtn,mi++,x+s*(150+h*110),ht2/2,z,rr,ht2,rr,C45,S45)}
   }
   if(k%3===0&&li<80){
-   put(pole,li,x+12.2*ca,2.7,z-12.2*sa,1,1,1,a);
-   put(lamp,li,x+12.2*ca,5.4,z-12.2*sa,1,1,1,a);
+   put(pole,li,x+12.2*ca,2.7,z-12.2*sa,1,1,1,ca,sa);
+   put(lamp,li,x+12.2*ca,5.4,z-12.2*sa,1,1,1,ca,sa);
    li++;
   }
   /* the scenery rocks were laid 8-18 m from the centre line, so nearly half of them
@@ -386,7 +395,7 @@ function rebuild(kp){
      all, so you drove straight through a boulder sitting on the tarmac verge. They now
      start at the 14 m the trees use, i.e. beyond the rail: 13.5 m at the nearest edge,
      clear of the car's 11.5 m reach. */
-  if(H(k,11)<.3){var h3=H(k,13);put(rock,i,x+(H(k,12)<.5?-1:1)*(14+h3*10),.4,z,1+h3*2,.8+h3,1+h3*2,h3*3)}else rock.setMatrixAt(i,ZM);
+  if(H(k,11)<.3){var h3=H(k,13),ra=h3*3;put(rock,i,x+(H(k,12)<.5?-1:1)*(14+h3*10),.4,z,1+h3*2,.8+h3,1+h3*2,Math.cos(ra),Math.sin(ra))}else rock.setMatrixAt(i,ZM);
  }
  road.count=n;dash.count=n;edge.count=sho.count=post.count=refl.count=rail.count=trunk.count=leaf.count=pine.count=2*n;
  rock.count=n;bld.count=bi;mtn.count=mi;pole.count=lamp.count=li;
