@@ -1593,7 +1593,15 @@ function loop(ts){
    var wx2=P.x+d.x,wy2=d.y,wz2=P.z+d.z;
    var len=1.4+d.v*.022;
    rainArr[ri*6]=wx2;rainArr[ri*6+1]=wy2;rainArr[ri*6+2]=wz2;
-   rainArr[ri*6+3]=wx2+windx*.9;rainArr[ri*6+4]=wy2+len;rainArr[ri*6+5]=wz2;
+   /* the streak is the drop's trail, so its tail has to sit where the drop came
+      from: up *and upwind*. The drop is carried along +x by the wind (d.x grows by
+      windx*14 per second) and falls at d.v, so its path leans 20 deg to -x at storm
+      force - yet the tail was written at +windx*.9, i.e. 26 deg to +x. Every streak
+      therefore leaned 45-53 deg the wrong way: the rain appeared to be blown
+      backwards, against the clouds (which drift +x) and against the snow (which is
+      pushed +x). Same magnitude, same length, same count - only the sign of the
+      tail's x offset changes, so each streak now lies along the drop's own path. */
+   rainArr[ri*6+3]=wx2-windx*.9;rainArr[ri*6+4]=wy2+len;rainArr[ri*6+5]=wz2;
   }
   /* the buffer holds the drops for the biggest preset (1700), but only rn of
      them are live and only those are drawn; needsUpdate re-uploaded the whole
