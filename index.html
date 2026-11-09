@@ -1489,7 +1489,15 @@ function loop(ts){
  fr++;ft+=Math.min(.5,dtR||.016);
  if(ft>2.5){
   var f=fr/ft;fr=0;ft=0;
-  if(f<22&&ad>.85){ad*=.94;resizeView()}
+  /* the guard only shrinks while ad is still above the .85 floor, but a 6% step
+     taken from .8836 lands on .8305 - past the floor - so the internal render
+     scale settled 2.3% under the 85% the floor promises. A device slow enough to
+     walk the whole way down (1 -> .94 -> .8836 -> .8305) ends up permanently
+     blurrier than designed, which is the one case the floor exists for, and the
+     Graphics menu's own preset scale is multiplied by it. Clamp the step to the
+     floor: every value already at or above .85 takes the identical step, so a
+     device that only ever dropped once or twice is bit-for-bit unchanged. */
+  if(f<22&&ad>.85){ad=Math.max(.85,ad*.94);resizeView()}
   else if(f>52&&ad<1){ad=Math.min(1,ad*1.05);resizeView()}
  }
 
