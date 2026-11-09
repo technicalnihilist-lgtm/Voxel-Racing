@@ -1373,7 +1373,21 @@ function step(dt){
  rv+=((ayB*.003-rp)*70-rv*9)*dt;rp+=rv*dt;
  bv+=((bump-bp)*90-bv*10)*dt;bp+=bv*dt;
  pp=clamp(pp,-.13,.13);rp=clamp(rp,-.11,.11);bp=clamp(bp,-.16,.16);
- wr+=vfS*dt/.6;
+ /* the roll rate divided by .6, the number that is right for the *traffic*
+    cars: their wheel is the .41-radius lathe scaled 1.5 by the car group, i.e.
+    0.606 of world radius, and .6 is its rolling radius. The player's car is that
+    same lathe scaled 1.5 as well, but mkP1() scales every wheel pivot by an
+    extra 1.08 on top, so the tyre actually drawn is 0.654 - measured in the page
+    as (geometry half-height x world scale): 0.6541 for the player's wheel
+    against 0.6057 for a traffic car's. Dividing the player's ground speed by .6
+    therefore turned its wheels 9.0% faster than the tarmac passing under them
+    (41.67 m/s / .6 = 69.4 rad/s where the drawn radius calls for 63.7): 1.157 rad
+    of wheel per frame at 150 km/h instead of 1.062, so the rims crawled against
+    the road and the wagon-wheel alias on the 5-spoke rim ran at the wrong rate.
+    Divide by the radius that is drawn. Only wr changes - it feeds nothing but
+    car.w's rotation.x - so the physics, the speedo and every position stay
+    bit-identical; the traffic cars keep .6, which is correct for their .606. */
+ wr+=vfS*dt/.654;
  return axB;
 }
 /* spawn() only chose where a car *should* be: the traffic loop is the only place
