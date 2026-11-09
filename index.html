@@ -1575,16 +1575,29 @@ function loop(ts){
  /* particles: spray, dust */
  if(state==='play'){
   var spd=Math.abs(vfS);
+  /* the tyre spray and the skid marks are laid at the rear axle, but the offset
+     they used - 1.6 m for the spray, 1.55 m for the marks - is the axle's
+     position in the car's own local units: the model is drawn through a 1.5x
+     group scale (mkCar's g.scale.setScalar(1.5)), so the rear tyres really sit
+     2.25 m behind the origin - measured in the page as the world position of
+     car.w, which reads -2.25 (rear pair) against +2.25 (front pair) with the
+     car at the origin and heading 0. Both effects were therefore laid ~0.7 m
+     ahead of the tyres that produce them, under the middle of the car: a drift
+     trail began well forward of the rear wheels and the wet plume came out of
+     the rear doors instead of off the contact patch. Anchor them at the drawn
+     axle. The lateral 1.45 already matches the drawn 1.514 (the 0.4 m wide mark
+     sits inside the 0.52 m wide contact patch), so only the longitudinal offset
+     changes; trigger, count, size, colour and lifetime are untouched. */
   if(WV.wet>.25&&spd>6&&Math.random()<dt*(8+WV.wet*22)){
    var rx=Math.cos(P.h),rz=-Math.sin(P.h);
    var side=Math.random()<.5?-1:1;
-   var wx=P.x+rx*side*1.45-Math.sin(P.h)*1.6;
-   var wz=P.z+rz*side*1.45-Math.cos(P.h)*1.6;
+   var wx=P.x+rx*side*1.45-Math.sin(P.h)*2.25;
+   var wz=P.z+rz*side*1.45-Math.cos(P.h)*2.25;
    emit(wx,.18,wz,(Math.random()-.5)*2.2+Math.sin(P.h)*-2,1.2+Math.random()*1.6,(Math.random()-.5)*2.2+Math.cos(P.h)*-2,
     .22+Math.random()*.22,.82,.88,.95,.5,8);
   }
   if(offRoad&&spd>5&&Math.random()<dt*14){
-   emit(P.x+(Math.random()-.5)*2,.25,P.z-Math.cos(P.h)*1.6,(Math.random()-.5)*3,1+Math.random()*2,(Math.random()-.5)*3,
+   emit(P.x+(Math.random()-.5)*2,.25,P.z-Math.cos(P.h)*2.25,(Math.random()-.5)*3,1+Math.random()*2,(Math.random()-.5)*3,
     .3+Math.random()*.3,.55,.44,.3,.65,7);
   }
   /* skid marks */
@@ -1602,7 +1615,7 @@ function loop(ts){
       ring, which falls back to the full upload. */
    var sK0=skidI;
    for(var sdx=-1;sdx<=1;sdx+=2){
-    D.position.set(P.x+rx2*sdx*1.45-Math.sin(P.h)*1.55,.135,P.z+rz2*sdx*1.45-Math.cos(P.h)*1.55);
+    D.position.set(P.x+rx2*sdx*1.45-Math.sin(P.h)*2.25,.135,P.z+rz2*sdx*1.45-Math.cos(P.h)*2.25);
     D.rotation.set(0,P.h,0);D.scale.set(1,1,1);D.updateMatrix();
     skid.setMatrixAt(skidI,D.matrix);
     skidI=(skidI+1)%SKIDN;
