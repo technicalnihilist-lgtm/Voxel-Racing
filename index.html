@@ -1031,6 +1031,18 @@ var KM={ArrowLeft:'l',a:'l',ArrowRight:'r',d:'r',ArrowUp:'g',w:'g',ArrowDown:'rv
 addEventListener('keydown',function(e){
  var k=KM[e.key.length>1?e.key:e.key.toLowerCase()];
  if(k){I[k]=1;e.preventDefault()}
+ /* the five one-shot actions below are toggles, not held controls, but the OS
+    repeats a held key about 30 times a second and every repeat ran them again:
+    holding C spun the camera through all three views as fast as the keyboard
+    repeated (and fired cycCam's message each time), holding N walked the whole
+    weather list and T the whole time-of-day list - each step firing its own
+    message and setTimeout - holding R reset the car to the centre line on every
+    repeat, so a player who held it to get unstuck never got going, and holding P
+    toggled pause and resume alternately. Only the first press of a physical key
+    press should act. The five movement keys above are flags set on the first
+    press and cleared on keyup, so they are unaffected - and they are still set
+    and still preventDefault on a repeat, before this guard. */
+ if(e.repeat)return;
  if(e.key==='c'||e.key==='C')cycCam();
  if(e.key==='r'||e.key==='R')resetCar();
  if(e.key==='n'||e.key==='N'){var ks=Object.keys(WEATHER);setWeather(ks[(ks.indexOf(wName)+1)%ks.length])}
