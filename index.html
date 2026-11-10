@@ -1612,8 +1612,21 @@ function loop(ts){
    emit(wx,.18,wz,(Math.random()-.5)*2.2+Math.sin(P.h)*-2,1.2+Math.random()*1.6,(Math.random()-.5)*2.2+Math.cos(P.h)*-2,
     .22+Math.random()*.22,.82,.88,.95,.5,8);
   }
+  /* the off-road dust plume was anchored at the rear axle on one axis only. The
+     rear wheels sit 2.25 m behind the car's origin (1.5 group scale x the 1.5
+     rear pivot), so a plume point is the origin minus 2.25 m along the heading:
+     -sin(h)*2.25 in x *and* -cos(h)*2.25 in z. The z term was there and the x
+     term was not, so the anchor did not sit 2.25 m behind the car - it slid down
+     the world z axis instead, 2.25*cos(h) m from the origin at best and nothing
+     at all at a heading of 90 deg. On the sharpest bend (29.1 deg, z=18846) the
+     dust therefore left the car 1.10 m to the side of the rear tyres, from under
+     the door, and on the 52% of the track whose heading is past 10 deg it was
+     more than 0.4 m out. At heading 0 sin() is 0, so a straight section is
+     bit-identical; the spray and the skid marks already use both terms, so the
+     plume now starts where they do. Only the emission point moves - rate, count,
+     size, colour, life and gravity are untouched. */
   if(offRoad&&spd>5&&Math.random()<dt*14){
-   emit(P.x+(Math.random()-.5)*2,.25,P.z-Math.cos(P.h)*2.25,(Math.random()-.5)*3,1+Math.random()*2,(Math.random()-.5)*3,
+   emit(P.x+(Math.random()-.5)*2-Math.sin(P.h)*2.25,.25,P.z-Math.cos(P.h)*2.25,(Math.random()-.5)*3,1+Math.random()*2,(Math.random()-.5)*3,
     .3+Math.random()*.3,.55,.44,.3,.65,7);
   }
   /* skid marks */
