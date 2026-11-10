@@ -1355,9 +1355,25 @@ function step(dt){
        was closing on the other car, so a passing car shrugs you off sideways */
     var sgx=dx>0?1:-1;
     P.x=cx(P.z)+t.lane+sgx*2.9;
-    var lv=P.vx*sgx;
+    /* the speed closing on the other car is the one *across* the road, and this
+       read it off world x. The road curves: a car simply following it at 40 m/s
+       through the sharpest bend (-26.9 deg, z=7117) carries vx = -18.1 m/s while
+       its lateral speed is exactly 0, so the test saw 18 m/s of closing speed
+       where there was none and fired - vx went -18.12 -> +0.91 in one frame,
+       turning a 40 m/s run down the road into 31.4 m/s along it plus 17.0 m/s
+       straight out to the side, a 61 km/h sideways launch out of a car you were
+       only drawing level with, with the yaw kick and the shake sized by the same
+       phantom number. On a bend of the opposite sign the error hid real contacts
+       instead: a genuine 3 m/s drift into a car read as vx > 0 and produced no
+       shove at all. Project the velocity on the road normal, the way the
+       guardrail and the on-road test already do. At ang=0 the pair is (1,0), so
+       a straight road is bit-identical; the box, the thresholds, the 1.05
+       reflection and the yaw/shake scales are untouched. */
+    var a5=ang(P.z),ca5=Math.cos(a5),sa5=Math.sin(a5);
+    var lv=(P.vx*ca5-P.vz*sa5)*sgx;
     if(lv<0){
-     P.vx-=1.05*lv*sgx;
+     var lc=1.05*lv*sgx;
+     P.vx-=lc*ca5;P.vz+=lc*sa5;
      P.r-=sgx*Math.min(.5,Math.abs(lv)*.02);
      shake=Math.min(1,Math.abs(lv)*.05);
      if(hcool<=0){thud();hcool=.4}
