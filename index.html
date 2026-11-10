@@ -1402,8 +1402,16 @@ function step(dt){
     the road and the wagon-wheel alias on the 5-spoke rim ran at the wrong rate.
     Divide by the radius that is drawn. Only wr changes - it feeds nothing but
     car.w's rotation.x - so the physics, the speedo and every position stay
-    bit-identical; the traffic cars keep .6, which is correct for their .606. */
- wr+=vfS*dt/.654;
+    bit-identical; the traffic cars keep .6, which is correct for their .606.
+    That fix assumed every player car is mkP1(), but only models 1-3 are: model 0
+    is built by mkCar(), the traffic model, whose wheel pivots are not scaled
+    1.08, so the tyre actually drawn there is 0.6057 and not 0.654. Dividing by
+    .654 turned model 0's wheels 7.4% slower than the tarmac passing under them
+    (41.67 m/s / .654 = 63.72 rad/s where the drawn radius calls for 68.80) - it
+    had been within 0.9% at the old .6. Pick the divisor from the model that is
+    actually built, the way the hood cam already picks its height. Models 1-3
+    keep .654 to the digit. */
+ wr+=vfS*dt/(curCar?.654:.6057);
  return axB;
 }
 /* spawn() only chose where a car *should* be: the traffic loop is the only place
