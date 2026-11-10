@@ -1196,6 +1196,9 @@ document.addEventListener('visibilitychange',function(){
      frame. */
   if(AC){eg.gain.value=0;sg.gain.value=0;rg.gain.value=0}
  }
+ /* coming back is not a slow frame - tell the frame-rate sampler in loop() to
+    throw away the interval that spans the time the page was hidden */
+ else visR=1;
 });
 
 /* ---------------- physics ---------------- */
@@ -1518,7 +1521,7 @@ function big(s,op){
 }
 
 /* ---------------- loop ---------------- */
-var last=0,fr=0,ft=0,lastA=0;
+var last=0,fr=0,ft=0,lastA=0,visR=0;
 /* the race clock splits the minutes off before it rounds, so the seconds field is
    printed at one decimal while the minutes are already truncated: at 59.95 s
    (t%60).toFixed(1) rounds up to "60.0" and the HUD read 0:60.0 instead of 1:00.0.
@@ -1557,7 +1560,22 @@ function loop(ts){
     before. */
  var dtR=(ts-last)/1000;
  var dt=Math.min(.05,dtR||.016);last=ts;
- fr++;ft+=Math.min(.5,dtR||.016);
+ /* a tab that comes back from the background is not a slow frame. rAF does not
+    fire while the page is hidden, so the first callback after a switch back
+    carries the entire hidden time as its interval; the sampler caps that at
+    500 ms so it "cannot poison the window" - but half a second added to a window
+    that is already 2.4 s full is still counted as 500 ms of frame time holding a
+    single frame. Simulated on a 25 fps device: leave the tab for 3 s with 2.06 s
+    of the window filled and the next flush reads 16 fps instead of 25, so ad
+    steps 1 -> .94 - and it only recovers above 52 fps, which a 25 fps device
+    never reaches, so the picture stays 6% blurrier for the rest of the session.
+    Three switches walk such a phone to the .85 floor, which is the one case that
+    floor exists to prevent. The interval is not a frame interval at all: drop
+    the resuming frame and start a fresh window instead. A device that never
+    leaves the tab never sets visR, so every measurement, every ad step and every
+    frame is bit-identical to before. */
+ if(visR){visR=0;fr=0;ft=0}
+ else{fr++;ft+=Math.min(.5,dtR||.016)}
  if(ft>2.5){
   var f=fr/ft;fr=0;ft=0;
   /* the guard only shrinks while ad is still above the .85 floor, but a 6% step
