@@ -1257,7 +1257,22 @@ function setQ(v){
     preset still ends up with a map of its own size (three re-creates one on the
     next shadow pass), so the rendering is unchanged. */
  if(sun.shadow.map&&(c.sh<=0||sun.shadow.map.width!==c.sh)){sun.shadow.map.dispose();sun.shadow.map=null}
- for(var i=0;i<TR.length;i++)TR[i].g.visible=i<c.tr;
+ for(var i=0;i<TR.length;i++){
+  var tq=TR[i],was=tq.g.visible;tq.g.visible=i<c.tr;
+  /* the traffic loop only moves cars that are visible, so a car dropped by a
+     lighter preset's traffic count stops dead where it stood - and the preset can
+     be changed mid-race from the pause menu. Come back to a higher count and the
+     frozen cars reappear at the position they held when they vanished, which can
+     be anywhere in the ~530 m band the traffic loop keeps around the player: one
+     reappearing in your lane is a contact the instant play resumes, shoving the
+     car up to 2.9 m sideways (or snapping it 6.9 m down the road on the rear-end
+     axis) with no car having driven into it. Respawn every car that becomes
+     visible again - it was not moving while hidden, so its position is stale by
+     however long the preset was down, and spawn() drops it back into the window
+     ahead of you, out of contact. A car that stays visible, and a car being
+     hidden, are untouched. */
+  if(tq.g.visible&&!was)spawn(tq);
+ }
  var farBase=(c.n-12)*4*.95;
  S.fog.near=farBase*.25;S.fog.far=farBase;C.far=farBase+120;C.updateProjectionMatrix();
  var bs=document.querySelectorAll('[data-q]');
