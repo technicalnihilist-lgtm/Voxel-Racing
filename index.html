@@ -328,6 +328,25 @@ function upd(m){
   m.instanceColor.needsUpdate=true;
  }
 }
+/* the same upload, but for one slice of the buffer: the scenery meshes below are
+   only partially rewritten when the segment window slides (see rebuild()), so
+   they must only push the slots that changed. A full rebuild keeps the old
+   behaviour - upload the drawn prefix - and the fallback when the slice covers
+   the whole array is the whole array, exactly as before. */
+function updR(m,lo,hi,full){
+ var a=m.instanceMatrix,off=0,cn;
+ if(full)cn=m.count*16;else{off=lo*16;cn=(hi-lo+1)*16}
+ if(cn>0&&off+cn<a.array.length){a.updateRange.offset=off;a.updateRange.count=cn}
+ else{a.updateRange.offset=0;a.updateRange.count=-1}
+ a.needsUpdate=true;
+ var c=m.instanceColor;
+ if(c){
+  if(full)cn=m.count*3;else{off=lo*3;cn=(hi-lo+1)*3}
+  if(cn>0&&off+cn<c.array.length){c.updateRange.offset=off;c.updateRange.count=cn}
+  else{c.updateRange.offset=0;c.updateRange.count=-1}
+  c.needsUpdate=true;
+ }
+}
 
 var roadMat=new T.MeshStandardMaterial({map:ASP.c,roughnessMap:ASP.r,bumpMap:ASP.b,bumpScale:.02,metalness:0,roughness:1,color:0xffffff,envMapIntensity:.35});
 var road=IM(new T.BoxGeometry(12,.26,4.6),roadMat,MAXT);road.receiveShadow=true;
@@ -391,29 +410,70 @@ function put(m,i,x,y,z,sx,sy,sz,c,s){
 }
 
 var curK=-1e9;
+/* rebuild() lays out the window of n segments around the car, and that window
+   slides by exactly one segment each time the car crosses a 4 m boundary - 12 to
+   20 times a second at race speed. Every one of those rebuilds rewrote all n
+   segments: ~2,300 instance matrices and ~200 KB of instance data, 461 us of the
+   main thread at High, for a window in which exactly one segment is new. A
+   segment's scenery is a pure function of its own index k (cx/ang of k*4 and the
+   H() hashes of k), so nothing about a segment changes when the window slides -
+   only its position in the array did, because the instances were indexed by
+   their offset in the window (i) instead of by the segment.
+   Index them by the segment's slot in a ring of n slots (slot = k mod n): the n
+   segments in the window are n consecutive k, so they fill all n slots exactly
+   once, and the segment entering at the front takes precisely the slot the
+   departing segment vacated. A sliding rebuild then only has to write the one
+   segment that entered (plus the one at the far end, rewritten with the identical
+   data it already holds), and only that slice of the buffer is uploaded - 2 slots
+   instead of the whole prefix. Any jump that is not a single step - a restart, a
+   car reset, a collision that shoves the car more than one segment, the first
+   rebuild - lays out every segment as before, and so does a quality change,
+   because it changes n and the ring with it. The scene drawn is identical,
+   instance for instance. */
+var rbK=-1e9,rbN=-1,rbTD=-1;
 function rebuild(kp){
- curK=kp;var n=Q[q].n,td=Q[q].td,bi=0,mi=0,li=0;
+ var n=Q[q].n,td=Q[q].td,bi=0,mi=0,li=0;
+ var full=(n!==rbN||td!==rbTD)||(kp!==rbK+1&&kp!==rbK-1);
+ rbK=kp;rbN=n;rbTD=td;curK=kp;
+ var sp0=(kp-8)%n;if(sp0<0)sp0+=n;
+ var spN=(kp+n-9)%n;if(spN<0)spN+=n;
+ var lo=sp0<spN?sp0:spN,hi=sp0<spN?spN:sp0;
  for(var i=0;i<n;i++){
   var k=kp-8+i,z=k*4,x=cx(z),a=ang(z),ca=Math.cos(a),sa=Math.sin(a);
-  put(road,i,x,0,z,1,1,1,ca,sa);
-  cl.setScalar(.9+H(k,21)*.2);road.setColorAt(i,cl);
-  if(k%2===0)put(dash,i,x,.14,z,1,1,1,ca,sa);else dash.setMatrixAt(i,ZM);
+  var sp=k%n;if(sp<0)sp+=n;
+  /* a full rebuild writes every segment; a sliding one writes only the two ends
+     of the window (the one that entered, and the one that left the ring) */
+  var wr=full||i===0||i===n-1;
+  if(wr){
+   put(road,sp,x,0,z,1,1,1,ca,sa);
+   cl.setScalar(.9+H(k,21)*.2);road.setColorAt(sp,cl);
+   if(k%2===0)put(dash,sp,x,.14,z,1,1,1,ca,sa);else dash.setMatrixAt(sp,ZM);
+  /* the scenery rocks were laid 8-18 m from the centre line, so nearly half of them
+     landed on the paved shoulder inside the 11.4 m guardrail - well within reach of a
+     car the rail clamps to 9.9 m - and rocks, unlike trees, have no collision test at
+     all, so you drove straight through a boulder sitting on the tarmac verge. They now
+     start at the 14 m the trees use, i.e. beyond the rail: 13.5 m at the nearest edge,
+     clear of the car's 11.5 m reach. */
+  if(H(k,11)<.3){var h3=H(k,13),ra=h3*3;put(rock,sp,x+(H(k,12)<.5?-1:1)*(14+h3*10),.4,z,1+h3*2,.8+h3,1+h3*2,Math.cos(ra),Math.sin(ra))}else rock.setMatrixAt(sp,ZM);
+  }
   for(var s=-1;s<=1;s+=2){
-   var j=i*2+(s>0?1:0);
-   put(edge,j,x+s*5.5*ca,.14,z-s*5.5*sa,1,1,1,ca,sa);
-   put(sho,j,x+s*9*ca,-.05,z-s*9*sa,1,1,1,ca,sa);
-   put(rail,j,x+s*11.4*ca,.68,z-s*11.4*sa,1,1,1,ca,sa);
-   put(post,j,x+s*11.4*ca,.4,z-s*11.4*sa,1,1,1,ca,sa);
-   put(refl,j,x+s*11.3*ca,.72,z-s*11.3*sa,1,1,1,ca,sa);
+   var j=sp*2+(s>0?1:0);
    var h=H(k,s+3);
-   if(H(k,s+7)<td){
-    var o=14+h*25,tx=x+s*o,hh=H(k,s+9),pn=hh<.45,sc=.9+hh*.7;
-    put(trunk,j,tx,0,z,sc,sc,sc,1,0);
-    if(pn){put(pine,j,tx,0,z,sc,sc,sc,1,0);leaf.setMatrixAt(j,ZM);cl.setHSL(.35,.42,.13+h*.07);pine.setColorAt(j,cl);leaf.setColorAt(j,cl)}
-    else{put(leaf,j,tx,0,z,sc,sc,sc,1,0);pine.setMatrixAt(j,ZM);cl.setHSL(.23+hh*.08,.42,.15+h*.12);leaf.setColorAt(j,cl);pine.setColorAt(j,cl)}
-   }else{
-    trunk.setMatrixAt(j,ZM);leaf.setMatrixAt(j,ZM);pine.setMatrixAt(j,ZM);
-    cl.setHex(0x000000);leaf.setColorAt(j,cl);pine.setColorAt(j,cl);
+   if(wr){
+    put(edge,j,x+s*5.5*ca,.14,z-s*5.5*sa,1,1,1,ca,sa);
+    put(sho,j,x+s*9*ca,-.05,z-s*9*sa,1,1,1,ca,sa);
+    put(rail,j,x+s*11.4*ca,.68,z-s*11.4*sa,1,1,1,ca,sa);
+    put(post,j,x+s*11.4*ca,.4,z-s*11.4*sa,1,1,1,ca,sa);
+    put(refl,j,x+s*11.3*ca,.72,z-s*11.3*sa,1,1,1,ca,sa);
+    if(H(k,s+7)<td){
+     var o=14+h*25,tx=x+s*o,hh=H(k,s+9),pn=hh<.45,sc=.9+hh*.7;
+     put(trunk,j,tx,0,z,sc,sc,sc,1,0);
+     if(pn){put(pine,j,tx,0,z,sc,sc,sc,1,0);leaf.setMatrixAt(j,ZM);cl.setHSL(.35,.42,.13+h*.07);pine.setColorAt(j,cl);leaf.setColorAt(j,cl)}
+     else{put(leaf,j,tx,0,z,sc,sc,sc,1,0);pine.setMatrixAt(j,ZM);cl.setHSL(.23+hh*.08,.42,.15+h*.12);leaf.setColorAt(j,cl);pine.setColorAt(j,cl)}
+    }else{
+     trunk.setMatrixAt(j,ZM);leaf.setMatrixAt(j,ZM);pine.setMatrixAt(j,ZM);
+     cl.setHex(0x000000);leaf.setColorAt(j,cl);pine.setColorAt(j,cl);
+    }
    }
    if(k%6===0&&bi<80){var w=8+h*8,ht=8+H(k,s+5)*28;put(bld,bi,x+s*(26+h*22),ht/2,z,w,ht,w,1,0);cl.setHSL(.6,.04,.42+h*.32);bld.setColorAt(bi++,cl)}
    if(k%10===0&&mi<40){var rr=60+h*60,ht2=40+H(k,s+2)*60;put(mtn,mi++,x+s*(150+h*110),ht2/2,z,rr,ht2,rr,C45,S45)}
@@ -423,17 +483,14 @@ function rebuild(kp){
    put(lamp,li,x+12.2*ca,5.4,z-12.2*sa,1,1,1,ca,sa);
    li++;
   }
-  /* the scenery rocks were laid 8-18 m from the centre line, so nearly half of them
-     landed on the paved shoulder inside the 11.4 m guardrail - well within reach of a
-     car the rail clamps to 9.9 m - and rocks, unlike trees, have no collision test at
-     all, so you drove straight through a boulder sitting on the tarmac verge. They now
-     start at the 14 m the trees use, i.e. beyond the rail: 13.5 m at the nearest edge,
-     clear of the car's 11.5 m reach. */
-  if(H(k,11)<.3){var h3=H(k,13),ra=h3*3;put(rock,i,x+(H(k,12)<.5?-1:1)*(14+h3*10),.4,z,1+h3*2,.8+h3,1+h3*2,Math.cos(ra),Math.sin(ra))}else rock.setMatrixAt(i,ZM);
  }
  road.count=n;dash.count=n;edge.count=sho.count=post.count=refl.count=rail.count=trunk.count=leaf.count=pine.count=2*n;
  rock.count=n;bld.count=bi;mtn.count=mi;pole.count=lamp.count=li;
- upd(road);upd(dash);upd(edge);upd(sho);upd(post);upd(refl);upd(rail);upd(trunk);upd(leaf);upd(pine);upd(rock);upd(bld);upd(mtn);upd(pole);upd(lamp);
+ updR(road,lo,hi,full);updR(dash,lo,hi,full);updR(rock,lo,hi,full);
+ updR(edge,lo*2,hi*2+1,full);updR(sho,lo*2,hi*2+1,full);updR(post,lo*2,hi*2+1,full);
+ updR(refl,lo*2,hi*2+1,full);updR(rail,lo*2,hi*2+1,full);updR(trunk,lo*2,hi*2+1,full);
+ updR(leaf,lo*2,hi*2+1,full);updR(pine,lo*2,hi*2+1,full);
+ upd(bld);upd(mtn);upd(pole);upd(lamp);
 }
 
 /* ---------------- car ---------------- */
