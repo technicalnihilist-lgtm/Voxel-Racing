@@ -1624,17 +1624,35 @@ var last=0,fr=0,ft=0,lastA=0,visR=0,bootF=1;
    the tenth that is actually displayed first, then split, so the carry goes into
    the minute like a real clock. */
 function fmt(t){var s=Math.round(t*10)/10,m=Math.floor(s/60);return m+':'+(s-m*60).toFixed(1).padStart(4,'0')}
+/* the HUD is refreshed every third frame, and all seven writes were
+   unconditional - six `getElementById` lookups plus seven DOM writes, ~20 times a
+   second, whatever the game was doing. `textContent=` is not a cheap no-op when
+   the string is already there: the setter throws away the element's text node and
+   builds a new one, so it is a real DOM mutation that invalidates that node's
+   style every time, even for a value that cannot have changed. Gear, checkpoint
+   and the weather clock only change a few times a second at most, and while the
+   menu is up (the HUD is display:none, nothing is being driven) the whole block
+   still ran. Look the seven nodes up once, remember the last string written and
+   write only what differs; leave the block alone entirely while the HUD is
+   hidden. The strings written are byte-identical to the ones the old code
+   assigned - same values, same formatting, same order - so the HUD shows exactly
+   what it showed before. */
+var HUDE=null,HUDS={};
 function hud(){
- var kmh=Math.abs(vfS)*3.6|0;
- $('sv').textContent=kmh;
- $('gr').textContent=vfS<-.5?'R':kmh<2?'N':gear+1;
- $('tm').textContent=fmt(tt);
- $('ds').textContent=Math.max(0,P.z|0);
- $('cp').textContent=cps;
- var rpm=clamp((erpm-1000)/7200,0,1);
- $('tach').firstChild.style.width=(rpm*100)+'%';
+ if(state==='menu')return;
+ if(!HUDE)HUDE={sv:$('sv'),gr:$('gr'),tm:$('tm'),ds:$('ds'),cp:$('cp'),tach:$('tach').firstChild,wt:$('wt')};
+ var kmh=Math.abs(vfS)*3.6|0,v=''+kmh;
+ if(v!==HUDS.sv){HUDE.sv.textContent=v;HUDS.sv=v}
+ v=vfS<-.5?'R':kmh<2?'N':''+(gear+1);
+ if(v!==HUDS.gr){HUDE.gr.textContent=v;HUDS.gr=v}
+ v=fmt(tt);if(v!==HUDS.tm){HUDE.tm.textContent=v;HUDS.tm=v}
+ v=''+Math.max(0,P.z|0);if(v!==HUDS.ds){HUDE.ds.textContent=v;HUDS.ds=v}
+ v=''+cps;if(v!==HUDS.cp){HUDE.cp.textContent=v;HUDS.cp=v}
+ var rpm=clamp((erpm-1000)/7200,0,1);v=(rpm*100)+'%';
+ if(v!==HUDS.tach){HUDE.tach.style.width=v;HUDS.tach=v}
  var hr=Math.floor(tod*24),mn=Math.floor((tod*24%1)*60);
- $('wt').textContent=wName.toUpperCase()+' · '+(hr<10?'0':'')+hr+':'+(mn<10?'0':'')+mn;
+ v=wName.toUpperCase()+' · '+(hr<10?'0':'')+hr+':'+(mn<10?'0':'')+mn;
+ if(v!==HUDS.wt){HUDE.wt.textContent=v;HUDS.wt=v}
 }
 
 function loop(ts){
