@@ -1054,8 +1054,17 @@ function thud(){
    weather to draw. The waveform is plain noise under a fixed decay envelope, so
    shape it once and start a new source on the kept buffer; a slight random
    playback rate keeps each rumble different, as the fresh noise used to. */
+/* a lightning strike schedules its thunder 0.6-1.5 s after the flash, and a
+   strike whose timer came due after you left the tab still fired: the
+   visibility handler mutes the engine, tyre and rain gains, but a thunder clap
+   builds its own gain node at `vol*.9` and connected straight to the
+   destination, so a hidden tab played a full-volume rumble over whatever you
+   had switched to - the same leak the engine drone fix closed for the three
+   persistent sources. A strike that lands while the page is hidden is dropped;
+   the mix already follows this rule everywhere else, and no new strike can be
+   scheduled while hidden because the flash trigger lives in the render loop. */
 function thunder(){
- if(!AC)return;
+ if(!AC||document.hidden)return;
  if(!thunBuf){
   thunBuf=AC.createBuffer(1,AC.sampleRate*1.6,AC.sampleRate);
   var d=thunBuf.getChannelData(0);
