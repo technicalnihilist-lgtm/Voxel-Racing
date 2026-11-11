@@ -1240,10 +1240,23 @@ function setQ(v){
   if(TEXS[ti].anisotropy!==an){TEXS[ti].anisotropy=an;TEXS[ti].needsUpdate=true}
  }
  sun.castShadow=c.sh>0;
- if(c.sh>0){
-  sun.shadow.mapSize.set(c.sh,c.sh);
-  if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null}
- }
+ if(c.sh>0)sun.shadow.mapSize.set(c.sh,c.sh);
+ /* the shadow map was only released inside the `c.sh>0` branch, so a preset that
+    switches shadows *off* kept the map it had: try Ultra (4096 x 4096 RGBA + a
+    depth buffer, ~128 MB) and then drop to Low to make the game playable on the
+    phone that choked on it, and those 128 MB stay allocated for the rest of the
+    session - the exact opposite of what the Low preset is for, on the device that
+    needs it most. Measured in the page: after setQ('ultra') the map reads
+    4096x4096, and after setQ('low') it still reads 4096x4096 with castShadow
+    false, i.e. a map nothing will ever sample again. The same branch also threw
+    the map away whenever a preset was re-applied at the size it already had
+    (clicking the preset you are on: map=null, then a fresh 32 MB allocation on
+    the next frame). Release it exactly when this preset cannot use it - shadows
+    off, or a different map size - and leave a same-size switch alone, which is
+    also what the old code did whenever the size did not change. Every shadowed
+    preset still ends up with a map of its own size (three re-creates one on the
+    next shadow pass), so the rendering is unchanged. */
+ if(sun.shadow.map&&(c.sh<=0||sun.shadow.map.width!==c.sh)){sun.shadow.map.dispose();sun.shadow.map=null}
  for(var i=0;i<TR.length;i++)TR[i].g.visible=i<c.tr;
  var farBase=(c.n-12)*4*.95;
  S.fog.near=farBase*.25;S.fog.far=farBase;C.far=farBase+120;C.updateProjectionMatrix();
