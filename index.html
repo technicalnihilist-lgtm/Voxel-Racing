@@ -1600,7 +1600,7 @@ function big(s,op){
 }
 
 /* ---------------- loop ---------------- */
-var last=0,fr=0,ft=0,lastA=0,visR=0;
+var last=0,fr=0,ft=0,lastA=0,visR=0,bootF=1;
 /* the race clock splits the minutes off before it rounds, so the seconds field is
    printed at one decimal while the minutes are already truncated: at 59.95 s
    (t%60).toFixed(1) rounds up to "60.0" and the HUD read 0:60.0 instead of 1:00.0.
@@ -1653,7 +1653,23 @@ function loop(ts){
     the resuming frame and start a fresh window instead. A device that never
     leaves the tab never sets visR, so every measurement, every ad step and every
     frame is bit-identical to before. */
- if(visR){visR=0;fr=0;ft=0}
+ /* the very first callback is not a frame either, for the same reason. rAF's
+    timestamp counts from navigation start, so the interval the first call
+    carries is the whole page boot - parsing this 700 KB file, building the
+    canvas textures, the four PMREM environments and the first scenery
+    rebuild - and not the time a frame took. Measured in the page, the game
+    script finishes 17.8 s after navigation start under software GL (a few
+    hundred ms on a handset), and the .5 s cap turned that into 500 ms of
+    frame time holding a single frame: the first window closed after 2.0 s of
+    real frames but was scored against 2.5 s, so every device measured 20%
+    low exactly once. At 60 fps that reads 48.5 and changes nothing, but a
+    device at 24 fps read 19.6 - under the 22 fps limit - and took a 6% step
+    of render scale that it can only undo by reaching 52 fps, which a 24 fps
+    device never does: the picture stayed permanently blurrier than designed
+    because of the boot interval alone. Drop it and start the window on the
+    next frame, exactly as a tab resume does; every later measurement is
+    bit-identical to before. */
+ if(bootF||visR){bootF=0;visR=0;fr=0;ft=0}
  else{fr++;ft+=Math.min(.5,dtR||.016)}
  if(ft>2.5){
   var f=fr/ft;fr=0;ft=0;
