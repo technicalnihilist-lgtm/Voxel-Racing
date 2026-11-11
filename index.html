@@ -1636,8 +1636,17 @@ function loop(ts){
       slower car in its lane, so tv can be far below t.v, and using t.v spun its
       wheels up to 2.46x the ground speed while it was held up: spokes blurring as
       if the car were doing 86 km/h while it crawled at 36. */
-   t.g.w.forEach(function(m){m.rotation.x+=tv*dt/.6});
-   if(t.g.tail)t.g.tail.emissiveIntensity=.18;
+   /* the traffic wheels were advanced with a forEach callback, so every frame
+      allocated a fresh closure for every car on the road - seven of them, plus
+      the two the player's own wheels and steering pivots took, nine per frame
+      (540 a second at 60 fps, 1,080 at 120) of young-generation garbage for a
+      loop body that captures nothing but tv and dt. Walk the array directly:
+      the same four groups, in the same order, advanced by the same amount.
+      The tail-light line that followed wrote a constant the material is
+      already built with (mkCar's tail is emissiveIntensity .18 and nothing
+      ever changes a traffic car's), so it is a write per car per frame that
+      could never change a pixel - drop it. */
+   var twl=t.g.w;for(var twi=0;twi<twl.length;twi++)twl[twi].rotation.x+=tv*dt/.6;
   }
   gate.position.set(cx(cz),0,cz);gate.rotation.y=ang(cz);
  }
@@ -1774,8 +1783,10 @@ function loop(ts){
  car.rotation.y=P.h;
  car.b.rotation.set(pp,0,rp);
  car.b.position.y=bp+Math.sin(tt*60)*shake*.05;
- car.w.forEach(function(m){m.rotation.x=wr});
- car.f.forEach(function(p){p.rotation.y=dlt*1.5});
+ /* same nine-allocations-a-frame story as the traffic wheels: index the arrays
+    instead of building a closure per call, and write the identical transforms */
+ for(var cwi=0;cwi<car.w.length;cwi++)car.w[cwi].rotation.x=wr;
+ for(var cfi=0;cfi<car.f.length;cfi++)car.f[cfi].rotation.y=dlt*1.5;
  if(car.tail)car.tail.emissiveIntensity=braking?2.6:.2+ (WV.wet>.4?.5:0);
  if(car.glass)car.glass.opacity=.5+ (1-dayF)*.18;
 
