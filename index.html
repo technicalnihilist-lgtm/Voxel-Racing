@@ -430,6 +430,18 @@ var curK=-1e9;
    rebuild - lays out every segment as before, and so does a quality change,
    because it changes n and the ring with it. The scene drawn is identical,
    instance for instance. */
+/* every segment's cx(), ang() and the cos/sin of that angle are pure functions
+   of the segment index k, and a sliding rebuild re-visits all n of them (the
+   bld/mtn/pole/lamp placement still walks the whole window) even though only the
+   two ends are written: ~20 transcendental calls per segment, 150 segments,
+   12-20 times a second, and the heaviest thing the main thread does during a
+   race. Keep the last value computed for each of the 256 segment slots
+   (n is at most 190, so a window never aliases itself) and reuse it when the
+   same k comes round again - which, on a slide, is every segment but the one
+   that entered. The memo is keyed by k, so a hit returns the exact double cx(),
+   ang(), Math.cos() and Math.sin() returned; the instance data is unchanged to
+   the last bit. */
+var SGN=256,SGK=new Int32Array(SGN).fill(-2147483648),SGX=new Float64Array(SGN),SGC=new Float64Array(SGN),SGS=new Float64Array(SGN);
 var rbK=-1e9,rbN=-1,rbTD=-1;
 function rebuild(kp){
  var n=Q[q].n,td=Q[q].td,bi=0,mi=0,li=0;
@@ -439,7 +451,9 @@ function rebuild(kp){
  var spN=(kp+n-9)%n;if(spN<0)spN+=n;
  var lo=sp0<spN?sp0:spN,hi=sp0<spN?spN:sp0;
  for(var i=0;i<n;i++){
-  var k=kp-8+i,z=k*4,x=cx(z),a=ang(z),ca=Math.cos(a),sa=Math.sin(a);
+  var k=kp-8+i,z=k*4,ms=k&255,x,ca,sa;
+  if(SGK[ms]===k){x=SGX[ms];ca=SGC[ms];sa=SGS[ms]}
+  else{var a=ang(z);x=cx(z);ca=Math.cos(a);sa=Math.sin(a);SGK[ms]=k;SGX[ms]=x;SGC[ms]=ca;SGS[ms]=sa}
   var sp=k%n;if(sp<0)sp+=n;
   /* a full rebuild writes every segment; a sliding one writes only the two ends
      of the window (the one that entered, and the one that left the ring) */
