@@ -1344,6 +1344,50 @@ function treeHit(){
   }
  }
 }
+/* the checkpoint gate's two 6 m pillars stand 7 m either side of the centre
+   line - on the shoulder, well inside the 9.9 m the guardrail lets the car
+   reach - and nothing in the game ever tested against them: driven at the gate
+   along the shoulder the car passed 0.95 m from a post's centre, i.e. straight
+   through it, at 72 km/h with no thud, no sparks and no deflection, while a
+   tree trunk a few metres away is solid. Test the car's box against the two
+   posts in the gate's own frame and resolve on the axis of least overlap, so a
+   glancing hit on the shoulder shoves the car back onto the tarmac instead of
+   stopping it dead. The gate is always 800 m ahead, so the early-out costs
+   nothing on the rest of the track; a car down the middle of the road never
+   comes within 4.95 m of a post and is untouched. The 2.05 m half-width is
+   the drawn wheel track (2 x 1.757) plus the 0.5 m post, so nothing visible
+   ever intersects it. */
+function gateHit(){
+ var dzg=P.z-cz;
+ if(dzg>6||dzg<-6)return;
+ var a=ang(cz),ca=Math.cos(a),sa=Math.sin(a);
+ var dxg=P.x-cx(cz);
+ var lx=dxg*ca-dzg*sa,lz=dxg*sa+dzg*ca;
+ for(var s=-1;s<=1;s+=2){
+  var dl=lx-s*7;
+  if(Math.abs(dl)>=2.05||Math.abs(lz)>=3.7)continue;
+  var nlx=lx,nlz=lz;
+  if(2.05-Math.abs(dl)<=3.7-Math.abs(lz))nlx=s*7+(dl>0?2.05:-2.05);
+  else nlz=lz>0?3.7:-3.7;
+  var pdx=nlx-lx,pdz=nlz-lz,pl=Math.hypot(pdx,pdz);
+  dxg=nlx*ca+nlz*sa;dzg=-nlx*sa+nlz*ca;
+  P.x=cx(cz)+dxg;P.z=cz+dzg;
+  if(pl>.0001){
+   var nx=(pdx*ca+pdz*sa)/pl,nz=(-pdx*sa+pdz*ca)/pl;
+   var vn=P.vx*nx+P.vz*nz;
+   if(vn<0){
+    P.vx-=vn*nx*1.05;P.vz-=vn*nz*1.05;
+    shake=Math.min(1,-vn*.06);
+    if(hcool<=0){
+     thud();hcool=.4;
+     for(var e=0;e<7;e++)emit(P.x+(Math.random()-.5)*1.4,.9+Math.random()*.9,P.z+(Math.random()-.5)*1.4,
+      (Math.random()-.5)*4,1.5+Math.random()*3.5,(Math.random()-.5)*4,.3+Math.random()*.3,.8,.7,.45,.55,11);
+    }
+   }
+  }
+  break;
+ }
+}
 function step(dt){
  st+=((I.r-I.l)-st)*Math.min(1,dt*5.5);
  th+=((I.g?1:0)-th)*Math.min(1,dt*8);
@@ -1445,6 +1489,7 @@ function step(dt){
  if(shiftT>0)shiftT-=dt;
  else if(u>.5){if(erpm>7400&&gear<5){gear++;shiftT=.18}else if(erpm<3200&&gear>0){gear--;shiftT=.1}}
  treeHit();
+ gateHit();
  /* the last-resort clamp is a cross-road distance too - measure it the same way */
  var a4=ang(P.z),ca4=Math.cos(a4);
  var off2=(P.x-cx(P.z))*ca4;
