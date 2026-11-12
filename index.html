@@ -1799,7 +1799,26 @@ function loop(ts){
   }
  }
  if(state==='play'){lastA=step(dt)}
- else if(state==='count'){th+=((I.g?1:0)-th)*Math.min(1,dt*8);erpm=1000+th*4200;st+=((I.r-I.l)-st)*Math.min(1,dt*7)}
+ /* the standing start revs the engine and smooths the steering input, but it never
+    turned the front wheels. `st` is eased here on purpose, so that the throttle and
+    the wheel are already where you are holding them when the lights go out, and
+    step() turns `st` into the road-wheel angle `dlt` at the top of every substep -
+    but step() does not run during the countdown, so `dlt` kept the 0 newGame() gave
+    it while `st` climbed to 1.0. The car sat there with its wheels dead straight
+    through the whole 3-2-1 however hard you held a turn (measured: st 1.000, dlt
+    0.000, car.f[0].rotation.y 0.000 on the last count frame), and then the first
+    play frame computed dlt from that same st and the drawn wheel jumped 0 -> -0.69
+    rad (39.5 deg) in a single frame - a visible snap at GO, at the exact moment you
+    are looking at the car. Compute the same angle here, for the case step() would
+    compute at this car's speed: the standing start is at rest (au = 0, so the
+    speed-sensitive denominator is 1) on the centre line (onRoad = 1), i.e.
+    dlt = -st*.46, which is exactly what step()'s first substep writes a moment
+    later. Nothing else reads `dlt` except the drawn wheel, and step() recomputes it
+    from `st` before using it in the tyre model, so the handling, the grip and every
+    position stay bit-identical - only the angle drawn during the countdown moves,
+    and it now matches the angle drawn on the first play frame instead of snapping
+    to it. */
+ else if(state==='count'){th+=((I.g?1:0)-th)*Math.min(1,dt*8);erpm=1000+th*4200;st+=((I.r-I.l)-st)*Math.min(1,dt*7);dlt=-st*.46}
 
  if(state==='play'){
   if(P.z>cz){cps++;msg('Checkpoint '+cps+' · '+fmt(tt));cz+=800}
