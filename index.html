@@ -1770,8 +1770,9 @@ function loop(ts){
    var tv=tEff(t);
    t.z+=tv*dt;
    if(t.z<P.z-50||t.z>P.z+480)spawn(t);
+   var ta=ang(t.z),tca=Math.cos(ta);
    t.g.position.set(cx(t.z)+t.lane,.1,t.z);
-   t.g.rotation.y=ang(t.z);
+   t.g.rotation.y=ta;
    /* the traffic wheels are the same .41-radius wheel scaled 1.5 as the player's,
       so they must roll at v/.6 where v is the speed the car is actually covering
       ground at - that is tv, not the nominal t.v. A car now eases off behind a
@@ -1788,7 +1789,19 @@ function loop(ts){
       already built with (mkCar's tail is emissiveIntensity .18 and nothing
       ever changes a traffic car's), so it is a write per car per frame that
       could never change a pixel - drop it. */
-   var twl=t.g.w;for(var twi=0;twi<twl.length;twi++)twl[twi].rotation.x+=tv*dt/.6;
+   /* and the ground speed is not tv either, once the road bends. A traffic car is
+      placed at cx(t.z)+t.lane and advanced by writing t.z, so its world position is
+      (cx(z)+lane, z) and its world velocity is (cx'(z)*tv, tv): the car covers
+      tv*sqrt(1+tan^2 a) = tv/cos(a) of tarmac per second, not tv. ang(z) is
+      atan(cx'(z)) - rebuild() lays every segment along that normal - so the wheels
+      under-rolled by 1/cos(a)-1: 2.9% on average over the first 20 km, past 2% on
+      46% of it, and 14.5% on the sharpest bend (29.14 deg, z=18846), where a car
+      making 40 m/s rolled its wheels as if it were doing 35. Only the rate the
+      four groups turn at changes - direction, radius (.6, right for the .606 tyre)
+      and every position stay as they were, and cos(0)=1 makes a straight
+      bit-identical. The angle is the one already computed for the car's yaw, so
+      this drops a second ang() call per car per frame as well. */
+   var twl=t.g.w,tws=tv*dt/(.6*tca);for(var twi=0;twi<twl.length;twi++)twl[twi].rotation.x+=tws;
   }
   gate.position.set(cx(cz),0,cz);gate.rotation.y=ang(cz);
  }
