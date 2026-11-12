@@ -304,6 +304,25 @@ var amb=new T.AmbientLight(0x8899bb,.12);S.add(amb);
 
 /* ---------------- ground ---------------- */
 var gndMat=new T.MeshStandardMaterial({map:GRASS,roughness:.95,metalness:0,color:0xffffff});
+/* the grass is one flat quad at y = 0 and the tarmac is a box whose top sits
+   0.13 m above it (the shoulder only 0.02 m), so wherever the two are compared
+   the depth values are a hair apart - and at the hood camera, 2.24 m up and
+   looking almost along the road, a pixel 15 m out covers a 2 cm depth gap. Once
+   the buffer, the render scale or the ground's shader program has changed (a
+   night/day environment switch, an adaptive-resolution step), the ground started
+   winning that comparison and the tarmac vanished: sampled in the page on a
+   900x520 frame after a night-to-noon cycle, the three road probes at 0.5 of the
+   width read 111,158,89 / 149,184,116 / 134,175,105 - the grass texture, green
+   over grey - and stayed that way until the page was reloaded, while hiding the
+   ground plane revealed a perfectly good road underneath. Push the ground back
+   in depth only (polygon offset: no vertex moves, no colour or size changes) so
+   the road, the shoulder, the dashes, the skid marks and the shadow blob always
+   win the comparison; the same three probes then read 92,97,102 / 96,100,107 /
+   94,97,102 in all four repeats of the cycle, and turning the offset off again
+   brought the grass back (green-minus-red 46, 41, 39) within a second. The
+   ground is the lowest surface in the scene and nothing is drawn below it, so
+   biasing it back cannot hide anything else. */
+gndMat.polygonOffset=true;gndMat.polygonOffsetFactor=1;gndMat.polygonOffsetUnits=1;
 GRASS.repeat.set(160,160);
 var gnd=new T.Mesh(new T.PlaneGeometry(1600,1600),gndMat);
 gnd.rotation.x=-Math.PI/2;gnd.receiveShadow=true;S.add(gnd);
