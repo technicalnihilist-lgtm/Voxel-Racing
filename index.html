@@ -575,8 +575,9 @@ function addBeams(g){
   vertexShader:'varying vec3 vN;varying vec3 vV;varying float vL;void main(){vec4 mv=modelViewMatrix*vec4(position,1.0);vN=normalize(normalMatrix*normal);vV=normalize(-mv.xyz);vL=uv.y;gl_Position=projectionMatrix*mv;}',
   fragmentShader:'uniform vec3 uCol;uniform float uOp;varying vec3 vN;varying vec3 vV;varying float vL;void main(){float e=pow(abs(dot(vN,vV)),1.5);float f=pow(clamp(vL,0.0,1.0),1.7);gl_FragColor=vec4(uCol,e*f*uOp);}'
  });
+ g.beams=[];
  for(var s=-1;s<=1;s+=2){
-  var c=new T.Mesh(coneG,bm);c.position.set(s*.62,.58,2.2);g.add(c);
+  var c=new T.Mesh(coneG,bm);c.position.set(s*.62,.58,2.2);g.add(c);g.beams.push(c);
  }
  g.beamMat=bm;
 }
@@ -1041,6 +1042,23 @@ function updateSky(dt){
   var dark=clamp(Math.max(nightF,(1-WV.fogF)*1.05,(1-WV.sun)*.5),0,1);
   dark=smoothstep(.22,.85,dark);
   car.head.emissiveIntensity=.3+dark*2.4;
+  /* the player's two volumetric headlight cones were submitted and shaded on
+     every frame of the session, whatever the weather or the hour. Their opacity
+     is `dark*.5`, and `dark` is exactly 0 in clear weather with the sun up -
+     smoothstep(.22,.85,max(1-dayF,0,0)) is 0 for the whole day - so in daylight
+     the fragment shader ran (a pow(), a normalize and an abs-dot per pixel) over
+     the road ahead of the car and additive blending (src*srcAlpha + dst) then
+     added exactly nothing: an alpha of 0 makes the source term 0. They cover a
+     good part of the view from the hood camera, which looks straight down the
+     cone, so that is real fill on a phone. Hide them while the opacity is under
+     one 255th of full, where the additive term is below a single code value and
+     the image cannot change; above it they are drawn exactly as before. Only
+     the two cone meshes' `visible` flags move - the material, the uniforms, the
+     geometry, the spotlight and the emissive headlamps are untouched - and a
+     cone that is shown again is the same mesh with the same uOp it would have
+     had. */
+  var bv=dark>0.002;
+  if(car.beams[0].visible!==bv){car.beams[0].visible=bv;car.beams[1].visible=bv}
   car.beamMat.uniforms.uOp.value=dark*.5;
   car.beamMat.uniforms.uCol.value.copy(cSun).lerp(WHITE,.45);
   if(car.sl)car.sl.intensity=dark*4.6;
