@@ -2030,7 +2030,23 @@ function loop(ts){
       backwards, against the clouds (which drift +x) and against the snow (which is
       pushed +x). Same magnitude, same length, same count - only the sign of the
       tail's x offset changes, so each streak now lies along the drop's own path. */
-   rainArr[ri*6+3]=wx2-windx*.9;rainArr[ri*6+4]=wy2+len;rainArr[ri*6+5]=wz2;
+   var tX=-windx*.9,tY=len;
+   /* a streak is a fixed 1.4-2.7 m of world space, so its *apparent* length grows
+      without bound as the drop gets close to the camera: measured in the page over
+      a storm frame at 720p, the nearest drop (4.8 m away) drew a 365 px scratch
+      across the sky against a median streak of 27 px, and 18 of the 1,200 live
+      drops drew more than 100 px - white lines that read as glitches, not rain.
+      The rain box is 150 x 150 m around the car while the chase camera sits 11 m
+      behind it, so there are always a few drops within a few metres of the lens.
+      Cap the streak's angular length at 0.1 rad (about 72 px at 720p) by scaling
+      the whole tail vector - both the up component and the upwind one - whenever
+      it would exceed that. Only drops inside ~30 m of the camera change, they are
+      still drawn (shorter, which is what near rain looks like), and a drop at
+      0.1 rad or further writes exactly the tail it wrote before. */
+   var qx=wx2-C.position.x,qy=wy2-C.position.y,qz=wz2-C.position.z;
+   var q2=qx*qx+qy*qy+qz*qz,t2=tX*tX+tY*tY;
+   if(t2>q2*.01){var rk=Math.sqrt(q2*.01/t2);tX*=rk;tY*=rk}
+   rainArr[ri*6+3]=wx2+tX;rainArr[ri*6+4]=wy2+tY;rainArr[ri*6+5]=wz2;
   }
   /* the buffer holds the drops for the biggest preset (1700), but only rn of
      them are live and only those are drawn; needsUpdate re-uploaded the whole
