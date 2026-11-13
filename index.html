@@ -743,7 +743,7 @@ var car=mkCar(0xc0161b,1);S.add(car);
 /* traffic */
 var TR=[];
 var TRCOL=[0x2255cc,0xdddddd,0x222222,0xe0a800,0x2a9d4a,0x8a2be2,0xff7a00];
-for(var i=0;i<7;i++){var t={g:mkCar(TRCOL[i]),z:0,lane:3,v:15,effF:0,effV:0};S.add(t.g);TR.push(t)}
+for(var i=0;i<7;i++){var t={g:mkCar(TRCOL[i]),z:0,lane:3,v:15,effF:0,effV:0,on:1};S.add(t.g);TR.push(t)}
 
 /* checkpoint gate */
 var gate=new T.Group();
@@ -1323,7 +1323,7 @@ function setQ(v){
     next shadow pass), so the rendering is unchanged. */
  if(sun.shadow.map&&(c.sh<=0||sun.shadow.map.width!==c.sh)){sun.shadow.map.dispose();sun.shadow.map=null}
  for(var i=0;i<TR.length;i++){
-  var tq=TR[i],was=tq.g.visible;tq.g.visible=i<c.tr;
+  var tq=TR[i],was=tq.on;tq.on=i<c.tr;tq.g.visible=tq.on;
   /* the traffic loop only moves cars that are visible, so a car dropped by a
      lighter preset's traffic count stops dead where it stood - and the preset can
      be changed mid-race from the pause menu. Come back to a higher count and the
@@ -1336,7 +1336,7 @@ function setQ(v){
      however long the preset was down, and spawn() drops it back into the window
      ahead of you, out of contact. A car that stays visible, and a car being
      hidden, are untouched. */
-  if(tq.g.visible&&!was)spawn(tq);
+  if(tq.on&&!was)spawn(tq);
  }
  var farBase=(c.n-12)*4*.95;
  S.fog.near=farBase*.25;S.fog.far=farBase;C.far=farBase+120;C.updateProjectionMatrix();
@@ -1546,7 +1546,7 @@ function step(dt){
  var off2=(P.x-cx(P.z))*ca4;
  if(Math.abs(off2)>LIM+2){P.x=cx(P.z)+(off2>0?1:-1)*(LIM+2)/ca4;P.vx*=.5;P.vz*=.7}
  for(var ti=0;ti<TR.length;ti++){
-  var t=TR[ti];if(!t.g.visible)continue;
+  var t=TR[ti];if(!t.on)continue;
   /* the contact box has to be measured in road space, not in world axes. The
      traffic cars sit at cx(t.z)+t.lane and the player at P.x, and the road
      curves: cx() moves by up to 3.6 m across the 13.8 m the box spans, which is
@@ -1666,7 +1666,7 @@ function spawn(t){
  for(var a=0;a<6;a++){
   t.z=P.z+90+Math.random()*350;t.lane=(Math.random()<.5?-1:1)*3;
   var ok=1;
-  for(var j=0;j<TR.length;j++){var o=TR[j];if(o===t||!o.g.visible)continue;
+  for(var j=0;j<TR.length;j++){var o=TR[j];if(o===t||!o.on)continue;
    if(o.lane===t.lane&&Math.abs(o.z-t.z)<9){ok=0;break}}
   if(ok)break;
  }
@@ -1684,7 +1684,7 @@ function tEff(t){
  t.effF=1;t.effV=t.v;
  for(var j=0;j<TR.length;j++){
   var o=TR[j];
-  if(o===t||!o.g.visible||o.lane!==t.lane)continue;
+  if(o===t||!o.on||o.lane!==t.lane)continue;
   var gap=o.z-t.z;
   if(gap>0&&gap<9){var lv=Math.max(0,tEff(o)+(gap-9)*1.5);if(lv<t.effV)t.effV=lv}
  }
@@ -1876,7 +1876,7 @@ function loop(ts){
   var kk=Math.floor(P.z/4);if(kk!==curK)rebuild(kk);
   for(var i=0;i<TR.length;i++)TR[i].effF=0;
   for(var i=0;i<TR.length;i++){
-   var t=TR[i];if(!t.g.visible)continue;
+   var t=TR[i];if(!t.on)continue;
    /* traffic cars never collide with each other, so a faster car drove straight
       through a slower one sharing its lane - two cars visibly intersecting on
       ~7% of play frames. A car now eases off as it closes on the nearest car
@@ -1920,6 +1920,20 @@ function loop(ts){
   }
   gate.position.set(cx(cz),0,cz);gate.rotation.y=ang(cz);
  }
+
+ /* a traffic car past the fog is drawn exactly in the fog colour, so it cannot
+    put a pixel on screen - yet all of them were submitted on every frame of
+    every race whatever the weather. Fog ends 84 m ahead in the fog preset while
+    the traffic band is 480 m deep, so in that weather six of the seven cars were
+    132 of the frame's ~430 draw calls for geometry painted in one flat colour
+    over a road painted in the same flat colour; the storm, rain and snow presets
+    lose 20-35% of the same. Hide the ones past the fog. `on` is what the traffic
+    logic reads, so a hidden car keeps moving, keeps its place in the queue and
+    keeps its wheels turning, and the frame it comes back inside the fog it is
+    drawn exactly as before - a car sitting on the fog boundary is unchanged by
+    construction, because the fog factor there is already 1. */
+ var fogC=S.fog.far+2;
+ for(var i=0;i<TR.length;i++){var tvi=TR[i];tvi.g.visible=tvi.on&&(tvi.z-P.z)<fogC}
 
  /* traffic + gate wheels should also spin when not playing */
  if(state!=='play'){
