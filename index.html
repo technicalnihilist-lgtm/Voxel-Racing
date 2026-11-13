@@ -793,13 +793,28 @@ function stepParticles(dt){
     buffers (~19 KB) to the GPU every frame, and the mesh was still drawn with
     every point at zero alpha. Idle is the common case, so bail out instead. */
  if(pLive===0)return;
+ /* the sideways air drag on every particle was a fixed .985 per *frame*, so its
+    time constant followed the frame rate instead of the clock - the same mistake
+    the smoothed load transfer in step() was fixed for. A spray or dust point
+    kept .985^fps of its sideways speed after a second: 40% of it at 60 fps, but
+    64% at 30 and 16% at 120, so the plume's length was set by the device rather
+    than by the drag. Measured in the page with one particle emitted at 10 m/s
+    and no gravity: after .6 s it had travelled 4.66 m at 60 fps, 5.29 m at 30
+    and 3.68 m at 120 - a 30 fps phone threw the plume 44% further than a 120 fps
+    one. Ease it on the frame's own duration instead: .985^1 is exactly the
+    per-frame constant at 60 fps, so a 60 fps device writes the identical float
+    every frame and every position stays bit-identical; slower and faster
+    devices now follow the same wall-clock curve. Only the horizontal drag
+    changes - gravity, the ground bounce, size growth, colour and lifetime are
+    untouched. */
+ var pd=Math.pow(.985,dt*60);
  var live=0,lo=PMAX,hi=-1;
  for(var i=0;i<PMAX;i++){
   if(pLife[i]>0){
    pLife[i]-=dt;
    pVY[i]-=pGrav[i]*dt;
    pPos[i*3]+=pVX[i]*dt;pPos[i*3+1]+=pVY[i]*dt;pPos[i*3+2]+=pVZ[i]*dt;
-   pVX[i]*=.985;pVZ[i]*=.985;
+   pVX[i]*=pd;pVZ[i]*=pd;
    if(pPos[i*3+1]<0){pPos[i*3+1]=0;pVY[i]*=-.15;pVX[i]*=.7;pVZ[i]*=.7}
    var f=Math.max(0,pLife[i]/pMax[i]);
    pAl[i]=f*.38;pSz[i]+=dt*.9;
