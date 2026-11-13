@@ -150,7 +150,21 @@ var ASP=(function(){
   rg.fillStyle=v2<.5?'rgba(255,255,255,.35)':'rgba(0,0,0,.35)';
   rg.fillRect(Math.random()*w,Math.random()*w,2,2);
  }
- return {c:ctex(k,1,true),r:ctex(rk,1,false),b:ctex(rk,1,false)};
+ /* the roughness map and the bump map are two separate CanvasTextures wrapped
+    around the *same* 512x512 canvas `rk`, so the identical 1 MB of pixels was
+    uploaded to the GPU twice (1.33 MB each with mipmaps, on every device, for
+    the whole session) and the Graphics menu's anisotropy pass re-sent both of
+    them - 2 MB of bufferData per preset switch instead of 1 MB - for two
+    samplers that read the same texel: the roughness comes out of .g, the bump
+    out of .x, and the canvas is grey, so the two channels are the same value.
+    Nothing else about them differs either (same wrap, repeat, anisotropy,
+    LinearEncoding), so wrap the canvas once and hand the same texture to both
+    slots: one upload, one texture, one sampler state. Verified in the page by
+    rendering the hood cam at noon before and after pointing bumpMap at the
+    roughness texture: 0 of 400,000 pixels changed. `TEXS` keeps the single
+    entry it needs - setQ()'s `anisotropy!==an` guard skips the repeat. */
+ var rt=ctex(rk,1,false);
+ return {c:ctex(k,1,true),r:rt,b:rt};
 })();
 /* grass */
 var GRASS=(function(){
