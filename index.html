@@ -644,7 +644,7 @@ function mkCar(col,pl){
  B.flush();
  g.add(b);
  var sh=new T.Mesh(gSh,mSh);sh.rotation.x=-Math.PI/2;sh.position.y=.035;g.add(sh);
- g.w=[];g.f=[];
+ g.w=[];g.f=[];g.wr=0;
  var AXLES=[-1.4,1.4];
  /* a traffic car's brake calipers were four separate meshes, each with its own
     freshly built (but identical) red material, i.e. four draw submissions and
@@ -657,19 +657,21 @@ function mkCar(col,pl){
     has to turn with the steering, but they now share one material instead of
     four. */
  var calMat=new T.MeshStandardMaterial({color:0xcc1111,roughness:.5}),calG=pl?null:[];
+ if(!pl)g.twb=TW.length;
  for(var ai=0;ai<AXLES.length;ai++){
   var z2=AXLES[ai];
   for(var x2=-1;x2<=1;x2+=2){
-  var p=new T.Group(),w=new T.Group();
-  w.add(new T.Mesh(gTire,mTire),new T.Mesh(gRimSpokes,rm));
-  var dc=new T.Mesh(gDisc,dk);dc.position.x=-x2*.09;w.add(dc);
-  p.position.set(x2*.98,.4,z2);p.add(w);
   if(pl){
+   var p=new T.Group(),w=new T.Group();
+   w.add(new T.Mesh(gTire,mTire),new T.Mesh(gRimSpokes,rm));
+   var dc=new T.Mesh(gDisc,dk);dc.position.x=-x2*.09;w.add(dc);
+   p.position.set(x2*.98,.4,z2);p.add(w);
    var cal=new T.Mesh(gCal,calMat);cal.position.set(-x2*.09,.16,.12);p.add(cal);
+   g.add(p);g.w.push(w);if(z2>0)g.f.push(p);
   }else{
    var cg=gCal.clone();cg.translate(x2*.98-x2*.09,.4+.16,z2+.12);calG.push(cg);
+   TW.push({g:g,px:x2*.98,py:.4,pz:z2,dx:-x2*.09});
   }
-  g.add(p);g.w.push(w);if(z2>0)g.f.push(p);
   }
  }
  if(calG){
@@ -705,6 +707,21 @@ var GG1=(function(){var s=new T.Shape();s.moveTo(-1.2,.8);s.lineTo(-.6,1);s.quad
    when a model is discarded or the GPU buffers leak for the rest of the session */
 var CARGEOM=[BG,GG,BG1,GG1,gTire,gRim,gSp,gSpokes,gRimSpokes,gDisc,gCal,gEx,gExT,gExP,gSh];
 var CARMAT=[mTire,mSh,mPlate];
+/* a traffic car's four wheels were twelve meshes - a tyre, a rim-and-spoke part
+   and a brake disc, for each of four pivots - so the seven cars on the road were
+   84 draw submissions, 42% of a clear-weather frame's 199 (measured in the page
+   with the chase camera on a straight: hiding the traffic wheels drops the frame
+   from 199 calls to 115 and 173,736 triangles to 164,440). Nothing about them
+   needs its own submission: every traffic car's wheels turn at the same rate and
+   none of them steer, so the four cars' worth of geometry is the same three
+   parts repeated 28 times. They are drawn from three shared InstancedMeshes
+   instead (one per material), each 28 instances, and the instance matrix is the
+   matrix the wheel's own mesh used to carry: the car's transform composed with
+   the wheel pivot and the wheel's spin - the same numbers, in the same order, so
+   the wheels are drawn exactly where they were. mkCar() records where each
+   traffic wheel sits instead of building meshes for it; the player's car keeps
+   its own meshes, because its front pair steers. */
+var TW=[];
 function dropCar(o,mats){
  if(!o)return;
  o.traverse(function(n){
@@ -744,6 +761,44 @@ var car=mkCar(0xc0161b,1);S.add(car);
 var TR=[];
 var TRCOL=[0x2255cc,0xdddddd,0x222222,0xe0a800,0x2a9d4a,0x8a2be2,0xff7a00];
 for(var i=0;i<7;i++){var t={g:mkCar(TRCOL[i]),z:0,lane:3,v:15,effF:0,effV:0,on:1};S.add(t.g);TR.push(t)}
+
+/* the traffic wheels, one instanced mesh per material (see TW above). The two
+   materials the traffic cars used to build per car for their wheels are replaced
+   by one shared pair with the same values - the same colour, metalness,
+   roughness and envMapIntensity - so a wheel is shaded exactly as before, and
+   the three meshes upload one uniform set each instead of 84. */
+var TWN=TW.length;
+var twRimMat=new T.MeshStandardMaterial({color:0xc9ced6,metalness:1,roughness:.22,envMapIntensity:1.5});
+var twDiscMat=new T.MeshStandardMaterial({color:0x0a0a0c,metalness:.35,roughness:.55});
+function twIM(g,m){var o=new T.InstancedMesh(g,m,TWN);o.frustumCulled=false;o.instanceMatrix.setUsage(T.DynamicDrawUsage);S.add(o);return o}
+var twTire=twIM(gTire,mTire),twRim=twIM(gRimSpokes,twRimMat),twDisc=twIM(gDisc,twDiscMat);
+var twQ=new T.Quaternion(),twE=new T.Euler(),twSc=new T.Vector3(1.5,1.5,1.5),twCM=new T.Matrix4(),twPM=new T.Matrix4(),twSM=new T.Matrix4(),twOM=new T.Matrix4(),twT=new T.Matrix4();
+/* writes the 28 wheel matrices from the same numbers the wheel groups carried:
+   the car group's transform (composed exactly as Object3D.compose() does, from
+   the same position, yaw and 1.5 scale), the wheel's pivot, and the spin the
+   traffic loop has accumulated in t.g.wr. A car hidden by the fog cull gets its
+   four instances zeroed, which is what hiding its group did. */
+function twUpdate(){
+ for(var i=0;i<TR.length;i++){
+  var t=TR[i],vis=t.g.visible,base=t.g.twb;
+  if(vis){
+   twE.set(0,t.g.rotation.y,0);twQ.setFromEuler(twE);
+   twCM.compose(t.g.position,twQ,twSc);
+   twE.set(t.g.wr,0,0);twQ.setFromEuler(twE);
+   twSM.makeRotationFromQuaternion(twQ);
+  }
+  for(var j=0;j<4;j++){
+   var w=TW[base+j],k=base+j;
+   if(!vis){twTire.setMatrixAt(k,ZM);twRim.setMatrixAt(k,ZM);twDisc.setMatrixAt(k,ZM);continue}
+   twPM.makeTranslation(w.px,w.py,w.pz);
+   twT.multiplyMatrices(twCM,twPM).multiply(twSM);
+   twTire.setMatrixAt(k,twT);twRim.setMatrixAt(k,twT);
+   twOM.makeTranslation(w.dx,0,0);
+   twT.multiply(twOM);twDisc.setMatrixAt(k,twT);
+  }
+ }
+ twTire.instanceMatrix.needsUpdate=true;twRim.instanceMatrix.needsUpdate=true;twDisc.instanceMatrix.needsUpdate=true;
+}
 
 /* checkpoint gate */
 var gate=new T.Group();
@@ -1931,7 +1986,7 @@ function loop(ts){
       and every position stay as they were, and cos(0)=1 makes a straight
       bit-identical. The angle is the one already computed for the car's yaw, so
       this drops a second ang() call per car per frame as well. */
-   var twl=t.g.w,tws=tv*dt/(.6*tca);for(var twi=0;twi<twl.length;twi++)twl[twi].rotation.x+=tws;
+   t.g.wr+=tv*dt/(.6*tca);
   }
   gate.position.set(cx(cz),0,cz);gate.rotation.y=ang(cz);
  }
@@ -1949,6 +2004,10 @@ function loop(ts){
     construction, because the fog factor there is already 1. */
  var fogC=S.fog.far+2;
  for(var i=0;i<TR.length;i++){var tvi=TR[i];tvi.g.visible=tvi.on&&(tvi.z-P.z)<fogC}
+ /* the traffic wheels are three instanced meshes now, so they have to be told
+    where the cars they belong to are - once per frame, after the loop above has
+    decided which cars are drawn (see TW / twUpdate) */
+ twUpdate();
 
  /* traffic + gate wheels should also spin when not playing */
  if(state!=='play'){
