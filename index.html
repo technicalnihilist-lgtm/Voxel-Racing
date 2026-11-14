@@ -1838,6 +1838,28 @@ function hud(){
 function loop(ts){
  requestAnimationFrame(loop);
  if(document.hidden)return;
+ /* the rotate-to-landscape prompt is an opaque full-screen div (`#rot`, z-index
+    9, #05080f), and the loop knew nothing about it: a phone held upright went on
+    building and submitting the whole frame behind it. Measured in the page at
+    400x800 portrait: 48 draw calls and 84,514 triangles every frame, plus the
+    physics, the scenery rebuild, the particle/rain/snow updates, the camera and
+    the HUD - none of which can reach a pixel, a control or a sound the player can
+    use. It only stops when the device is turned, which a rotation-locked phone
+    never does. Skip the frame outright while the viewport is portrait, which is
+    the same condition the stylesheet's `@media (orientation:portrait)` uses, so
+    the overlay is up exactly when this branch runs and the picture cannot change.
+    `last` is kept current and the standing-start countdown is pushed forward by
+    the skipped time, so the first landscape frame carries an ordinary interval:
+    no stall for the frame-rate sampler to score, no physics jump, no countdown
+    skipped. The three persistent audio gains are muted the way the visibility
+    handler mutes them, because audio() is not being called to do it - a phone put
+    down in portrait otherwise drones the engine for as long as it sits there. In
+    landscape this branch is never taken and every line below runs as before. */
+ if(innerHeight>innerWidth){
+  if(AC){eg.gain.value=0;sg.gain.value=0;rg.gain.value=0}
+  if(state==='count'&&cdStart)cdStart+=Math.max(0,ts-last);
+  last=ts;return;
+ }
  /* the adaptive-resolution sampler below measures the frame rate as
     frames / elapsed, but it summed the *clamped* frame delta (dt is capped at
     50 ms so a stall cannot explode the physics). Below 20 fps that cap bites:
