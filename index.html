@@ -661,7 +661,7 @@ function mkCar(col,pl){
  B.flush();
  g.add(b);
  var sh=new T.Mesh(gSh,mSh);sh.rotation.x=-Math.PI/2;sh.position.y=.035;g.add(sh);
- g.w=[];g.f=[];g.wr=0;
+ g.wr=0;g.pw=pl?[]:null;
  var AXLES=[-1.4,1.4];
  /* a traffic car's brake calipers were four separate meshes, each with its own
     freshly built (but identical) red material, i.e. four draw submissions and
@@ -670,21 +670,19 @@ function mkCar(col,pl){
     front pair steers, in car.f), so the four are one rigid part. Merge them into
     a single mesh for the traffic cars (same boxes, same transforms, same
     material, castShadow still off): 7 traffic cars fall from 182 to 161 draw
-    calls a frame. The player keeps four separate meshes because its front pair
-    has to turn with the steering, but they now share one material instead of
-    four. */
- var calMat=new T.MeshStandardMaterial({color:0xcc1111,roughness:.5}),calG=pl?null:[];
+    calls a frame. The player's four are instances of one mesh now too (see
+    pwUpdate), so the two paths differ only in where the caliper offsets come
+    from: a baked geometry for the traffic cars, the instance matrix here. */
+ var calMat=pl?pwCalMat:new T.MeshStandardMaterial({color:0xcc1111,roughness:.5}),calG=pl?null:[];
  if(!pl)g.twb=TW.length;
  for(var ai=0;ai<AXLES.length;ai++){
   var z2=AXLES[ai];
   for(var x2=-1;x2<=1;x2+=2){
   if(pl){
-   var p=new T.Group(),w=new T.Group();
-   w.add(new T.Mesh(gTire,mTire),new T.Mesh(gRimSpokes,rm));
-   var dc=new T.Mesh(gDisc,dk);dc.position.x=-x2*.09;w.add(dc);
-   p.position.set(x2*.98,.4,z2);p.add(w);
-   var cal=new T.Mesh(gCal,calMat);cal.position.set(-x2*.09,.16,.12);p.add(cal);
-   g.add(p);g.w.push(w);if(z2>0)g.f.push(p);
+   /* the player's wheels are four instances of four shared meshes now, so record
+      where this one sits - the pivot, the spin, the disc offset and the caliper
+      offset - instead of building four meshes for it (see pwUpdate) */
+   g.pw.push({x:x2*.98,y:.4,z:z2,s:1,st:z2>0?1:0,dx:-x2*.09,cx:-x2*.09,cy:.16,cz:.12});
   }else{
    var cg=gCal.clone();cg.translate(x2*.98-x2*.09,.4+.16,z2+.12);calG.push(cg);
    TW.push({g:g,px:x2*.98,py:.4,pz:z2,dx:-x2*.09});
@@ -769,9 +767,14 @@ function mkP1(col,pl,gtr){
  if(gtr)A(2.1,.06,.7,cf,0,1.3,-2.35,-.1);
  else{A(1.9,.04,.45,cf,0,1.05,-2.3,-.12);A(.5,.12,.03,mPlate,0,.4,2.46)}
  B.flush();
- for(var i=0;i<g.w.length;i++){var p=g.w[i].parent;p.position.z=Math.sign(p.position.z)*1.5;p.position.x*=1.03;p.position.y=.43;p.scale.setScalar(1.08)}
+ for(var i=0;i<g.pw.length;i++){var w=g.pw[i];w.z=Math.sign(w.z)*1.5;w.x*=1.03;w.y=.43;w.s=1.08}
  return g;
 }
+/* the player's four brake calipers were four meshes with four identical red
+   materials; they are four instances of one mesh now, so they share one material.
+   The values are exactly the ones mkCar gave each of them: 0xcc1111, roughness
+   .5, metalness 0 (the constructor default), envMapIntensity 1 (the default). */
+var pwCalMat=new T.MeshStandardMaterial({color:0xcc1111,roughness:.5});
 var car=mkCar(0xc0161b,1);S.add(car);
 
 /* traffic */
@@ -789,6 +792,46 @@ var twRimMat=new T.MeshStandardMaterial({color:0xc9ced6,metalness:1,roughness:.2
 var twDiscMat=new T.MeshStandardMaterial({color:0x0a0a0c,metalness:.35,roughness:.55});
 function twIM(g,m){var o=new T.InstancedMesh(g,m,TWN);o.frustumCulled=false;o.instanceMatrix.setUsage(T.DynamicDrawUsage);S.add(o);return o}
 var twTire=twIM(gTire,mTire),twRim=twIM(gRimSpokes,twRimMat),twDisc=twIM(gDisc,twDiscMat);
+/* the player's four wheels were sixteen meshes - a tyre, a rim-and-spoke part, a
+   brake disc and a caliper for each of four pivots - so the one car you are
+   always looking at spent 16 draw submissions on its own wheels, more than a
+   whole traffic car costs (~10) and, on the Low preset's ~48-call frame, a third
+   of the frame. Nothing about them needs its own submission: the four tyres share
+   one geometry and one material, and so do the rims, the discs and the calipers,
+   so they are drawn from four InstancedMeshes of four instances each, exactly as
+   the traffic wheels are. The instance matrix is the matrix the group chain
+   composed: the car's transform (position, yaw, 1.5 scale), the wheel's pivot
+   (position, the steering angle on the front pair, the model's 1.08 pivot scale on
+   the P1 bodies), the spin about the wheel's own x, then the disc's and the
+   caliper's own offsets - the same numbers through the same compose() and
+   multiplyMatrices() calls three makes for a parent/child pair, so every wheel is
+   drawn where it was. All four materials are opaque, so no blend order changes.
+   The materials are the ones the wheels already used, by value: the tyre is the
+   shared mTire, the rim is twRimMat (0xc9ced6, metalness 1, roughness .22,
+   envMapIntensity 1.5 - what mkCar's rm is), the disc is twDiscMat (0x0a0a0c,
+   metalness .35, roughness .55 - what mkCar's dk is), the caliper is pwCalMat. */
+function pwIM(g,m){var o=new T.InstancedMesh(g,m,4);o.frustumCulled=false;o.instanceMatrix.setUsage(T.DynamicDrawUsage);S.add(o);return o}
+var pwTire=pwIM(gTire,mTire),pwRim=pwIM(gRimSpokes,twRimMat),pwDisc=pwIM(gDisc,twDiscMat),pwCal=pwIM(gCal,pwCalMat);
+for(var pwi=0;pwi<4;pwi++){pwTire.setMatrixAt(pwi,ZM);pwRim.setMatrixAt(pwi,ZM);pwDisc.setMatrixAt(pwi,ZM);pwCal.setMatrixAt(pwi,ZM)}
+var pwQ=new T.Quaternion(),pwE=new T.Euler(),pwSc=new T.Vector3(),pwPos=new T.Vector3(),pwCM=new T.Matrix4(),pwPM=new T.Matrix4(),pwSM=new T.Matrix4(),pwW=new T.Matrix4(),pwO=new T.Matrix4();
+function pwUpdate(){
+ var list=car.pw;if(!list)return;
+ pwE.set(0,P.h,0);pwQ.setFromEuler(pwE);pwSc.setScalar(1.5);
+ pwCM.compose(car.position,pwQ,pwSc);
+ for(var i=0;i<4;i++){
+  var w=list[i];
+  pwE.set(0,w.st?dlt*1.5:0,0);pwQ.setFromEuler(pwE);
+  pwPos.set(w.x,w.y,w.z);pwSc.setScalar(w.s);
+  pwPM.compose(pwPos,pwQ,pwSc);pwPM.premultiply(pwCM);
+  pwE.set(wr,0,0);pwQ.setFromEuler(pwE);pwSM.makeRotationFromQuaternion(pwQ);
+  pwW.multiplyMatrices(pwPM,pwSM);
+  pwTire.setMatrixAt(i,pwW);pwRim.setMatrixAt(i,pwW);
+  pwO.makeTranslation(w.dx,0,0);pwW.multiply(pwO);pwDisc.setMatrixAt(i,pwW);
+  pwO.makeTranslation(w.cx,w.cy,w.cz);pwW.multiplyMatrices(pwPM,pwO);pwCal.setMatrixAt(i,pwW);
+ }
+ pwTire.instanceMatrix.needsUpdate=true;pwRim.instanceMatrix.needsUpdate=true;
+ pwDisc.instanceMatrix.needsUpdate=true;pwCal.instanceMatrix.needsUpdate=true;
+}
 var twQ=new T.Quaternion(),twE=new T.Euler(),twSc=new T.Vector3(1.5,1.5,1.5),twCM=new T.Matrix4(),twPM=new T.Matrix4(),twSM=new T.Matrix4(),twOM=new T.Matrix4(),twT=new T.Matrix4();
 /* writes the 28 wheel matrices from the same numbers the wheel groups carried:
    the car group's transform (composed exactly as Object3D.compose() does, from
@@ -2220,10 +2263,10 @@ function loop(ts){
  car.rotation.y=P.h;
  car.b.rotation.set(pp,0,rp);
  car.b.position.y=bp+Math.sin(tt*60)*shake*.05;
- /* same nine-allocations-a-frame story as the traffic wheels: index the arrays
-    instead of building a closure per call, and write the identical transforms */
- for(var cwi=0;cwi<car.w.length;cwi++)car.w[cwi].rotation.x=wr;
- for(var cfi=0;cfi<car.f.length;cfi++)car.f[cfi].rotation.y=dlt*1.5;
+ /* the player's four wheels are four instances of four shared meshes (see
+    pwUpdate): the same matrices the group chain used to compose, written in one
+    call instead of sixteen meshes' worth of scene-graph updates */
+ pwUpdate();
  if(car.tail)car.tail.emissiveIntensity=braking?2.6:.2+ (WV.wet>.4?.5:0);
  if(car.glass)car.glass.opacity=.5+ (1-dayF)*.18;
 
