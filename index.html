@@ -1374,15 +1374,47 @@ function thunder(){
  var g=AC.createGain();g.gain.value=vol*.9;
  s.connect(f);f.connect(g);g.connect(AC.destination);s.start();
 }
+/* every frame wrote all six of the engine mix's AudioParams, whether or not the
+   value could have changed: the two oscillator frequencies, the filter cutoff,
+   and the engine, tyre and rain gains. A `.value =` is not a plain field write -
+   it posts the new value to the audio thread - and measured in the page it costs
+   4.7-9.5 us: eo.frequency 5.28, eo2.frequency 5.28, flt.frequency 4.74, eg.gain
+   8.62, sg.gain 4.86, rg.gain 9.52, i.e. 25.6 us for the six (audio() with the
+   context up benches at 25.56 us a call against 0.22 us with it down, so 99% of
+   the function was those writes). Most of them cannot change anything: the tyre
+   gain is exactly 0 whenever the tyres are not sliding and the rain gain is
+   exactly 0 in every dry preset, so a clear-weather race spent ~14 us of every
+   frame telling the mixer the silence was still silent - and in the menu, where
+   the car is at rest and the throttle has decayed to 0, all six hold one constant
+   value for as long as the panel is up, i.e. the whole 25.6 us a frame spent
+   re-stating what the graph already holds. Keep the last value written to each
+   param and write only the ones that differ: the same values reach the graph in
+   the same order minus the repeats, and repeating a value a param already holds
+   is silent, so the mix is unchanged. The caches start as NaN so the first call
+   after initAudio() still writes all six, and the two mute paths - the hidden tab
+   and the portrait view - now go through muteMix(), which updates the memo, so a
+   value they zero can never be skipped by a stale cache. */
+var aF0=NaN,aF1=NaN,aF2=NaN,aG0=NaN,aG1=NaN,aG2=NaN;
+function muteMix(){
+ if(!AC)return;
+ eg.gain.value=0;sg.gain.value=0;rg.gain.value=0;
+ aG0=0;aG1=0;aG2=0;
+}
 function audio(rpm,t,sk){
  if(!AC)return;
  var on=(state==='play'||state==='count');
  var f0=42+rpm*115;
- eo.frequency.value=f0;eo2.frequency.value=f0*.5;
- flt.frequency.value=380+rpm*2400+t*600;
- eg.gain.value=on?vol*(.028+.055*t):0;
- sg.gain.value=on?vol*Math.min(.1,sk*.035):0;
- rg.gain.value=on?vol*WV.rain*.075:0;
+ if(f0!==aF0){eo.frequency.value=f0;aF0=f0}
+ var h0=f0*.5;
+ if(h0!==aF2){eo2.frequency.value=h0;aF2=h0}
+ var f1=380+rpm*2400+t*600;
+ if(f1!==aF1){flt.frequency.value=f1;aF1=f1}
+ var g0=on?vol*(.028+.055*t):0;
+ if(g0!==aG0){eg.gain.value=g0;aG0=g0}
+ var g1=on?vol*Math.min(.1,sk*.035):0;
+ if(g1!==aG1){sg.gain.value=g1;aG1=g1}
+ var g2=on?vol*WV.rain*.075:0;
+ if(g2!==aG2){rg.gain.value=g2;aG2=g2}
 }
 
 /* ---------------- input ---------------- */
@@ -1586,7 +1618,7 @@ document.addEventListener('visibilitychange',function(){
      the car went on roaring in the background with the race already paused. Mute
      the mix here; the loop restores it from the physics state on the next visible
      frame. */
-  if(AC){eg.gain.value=0;sg.gain.value=0;rg.gain.value=0}
+  muteMix()
  }
  /* coming back is not a slow frame - tell the frame-rate sampler in loop() to
     throw away the interval that spans the time the page was hidden */
@@ -2019,7 +2051,7 @@ function loop(ts){
     down in portrait otherwise drones the engine for as long as it sits there. In
     landscape this branch is never taken and every line below runs as before. */
  if(innerHeight>innerWidth){
-  if(AC){eg.gain.value=0;sg.gain.value=0;rg.gain.value=0}
+  muteMix()
   if(state==='count'&&cdStart)cdStart+=Math.max(0,ts-last);
   last=ts;return;
  }
