@@ -781,6 +781,85 @@ var car=mkCar(0xc0161b,1);S.add(car);
 var TR=[];
 var TRCOL=[0x2255cc,0xdddddd,0x222222,0xe0a800,0x2a9d4a,0x8a2be2,0xff7a00];
 for(var i=0;i<7;i++){var t={g:mkCar(TRCOL[i]),z:0,lane:3,v:15,effF:0,effV:0,on:1};S.add(t.g);TR.push(t)}
+/* the seven traffic cars were 63 opaque body meshes - a main shell, a merged
+   bucket per material (bumpers, sills, mirrors, lamps, plate) and the calipers,
+   nine per car - so the traffic was 63 of the frame's 106 draw submissions, while
+   the player's own car costs 10 and the entire scenery 15. All seven are built by
+   the same mkCar() call from the same box list and differ only in the body
+   colour, so each part is the same mesh repeated seven times: draw them from one
+   InstancedMesh per part instead, with the body colour carried per instance
+   (instanceColor - the mechanism the trees, the pines, the buildings and the road
+   already use). Only the opaque parts are instanced; the glass and the soft
+   shadow blob stay per car, because merging a transparent draw changes the blend
+   order. The instance matrix is the matrix the mesh used to carry: the car
+   group's position, yaw and 1.5 scale composed with the mesh's own, which is
+   identity for every part here (all their offsets are baked into the geometry) -
+   anything that were not identity is left as a per-car mesh, and nothing in this
+   scene is. tbUpdate() writes those matrices from the same t.g fields the wheels
+   are already placed from, and a car hidden by the fog cull gets its instances
+   zeroed, which is exactly what hiding its group did. */
+var TB=[];
+var tbQ=new T.Quaternion(),tbE=new T.Euler(),tbS=new T.Vector3(1.5,1.5,1.5),tbC=new T.Matrix4();
+function tbIdent(m){
+ var e=m.elements;
+ return e[0]===1&&e[1]===0&&e[2]===0&&e[3]===0&&e[4]===0&&e[5]===1&&e[6]===0&&e[7]===0&&
+        e[8]===0&&e[9]===0&&e[10]===1&&e[11]===0&&e[12]===0&&e[13]===0&&e[14]===0&&e[15]===1;
+}
+function tbTake(m){
+ m.updateMatrix();
+ return m.isMesh&&m.material&&!m.material.transparent&&tbIdent(m.matrix);
+}
+function collapseTraffic(){
+ var g0=TR[0].g,b0=g0.b,i,j,k,m,bi=[],gi=[];
+ for(i=0;i<b0.children.length;i++)if(tbTake(b0.children[i]))bi.push(i);
+ for(i=0;i<g0.children.length;i++){m=g0.children[i];if(m!==b0&&tbTake(m))gi.push(i)}
+ /* every car built its own body material from its own colour, so the colour has
+    to move into the instance buffer; the bucket keeps one material, in white */
+ var bodyMat=g0.m,cols=[];
+ for(i=0;i<TR.length;i++)cols.push(TR[i].g.m.color.clone());
+ bodyMat.color.setHex(0xffffff);
+ function bucket(mm){
+  var im=new T.InstancedMesh(mm.geometry,mm.material,TR.length);
+  im.frustumCulled=false;im.castShadow=mm.castShadow;
+  im.instanceMatrix.setUsage(T.DynamicDrawUsage);
+  if(mm.material===bodyMat){
+   for(j=0;j<TR.length;j++)im.setColorAt(j,cols[j]);
+   im.instanceColor.needsUpdate=true;
+  }
+  S.add(im);TB.push(im);
+ }
+ for(i=0;i<bi.length;i++)bucket(b0.children[bi[i]]);
+ for(i=0;i<gi.length;i++)bucket(g0.children[gi[i]]);
+ /* the per-car copies go: the first car's geometry and materials are the ones
+    the instanced meshes now draw, the other six sets are released */
+ for(k=0;k<TR.length;k++){
+  var g=TR[k].g,b=g.b,dead=[];
+  for(i=0;i<bi.length;i++)dead.push(b.children[bi[i]]);
+  for(i=0;i<gi.length;i++)dead.push(g.children[gi[i]]);
+  for(i=0;i<dead.length;i++){
+   m=dead[i];m.parent.remove(m);
+   if(k>0){
+    if(CARGEOM.indexOf(m.geometry)<0)m.geometry.dispose();
+    if(m.material!==bodyMat&&CARMAT.indexOf(m.material)<0)m.material.dispose();
+   }
+  }
+ }
+}
+collapseTraffic();
+function tbUpdate(){
+ var i,j,t;
+ /* a preset with fewer cars switches the extra ones off and they are always the
+    tail of the list (setQ: on = i < c.tr), so the instance range stops at the last
+    car that is on - the switched-off ones would only submit degenerate vertices */
+ var nOn=0;while(nOn<TR.length&&TR[nOn].on)nOn++;
+ for(j=0;j<TR.length;j++){
+  t=TR[j];
+  tbE.set(0,t.g.rotation.y,0);tbQ.setFromEuler(tbE);
+  tbC.compose(t.g.position,tbQ,tbS);
+  for(i=0;i<TB.length;i++)TB[i].setMatrixAt(j,t.g.visible?tbC:ZM);
+ }
+ for(i=0;i<TB.length;i++){TB[i].count=nOn;TB[i].instanceMatrix.needsUpdate=true}
+}
 
 /* the traffic wheels, one instanced mesh per material (see TW above). The two
    materials the traffic cars used to build per car for their wheels are replaced
@@ -2114,6 +2193,9 @@ function loop(ts){
     where the cars they belong to are - once per frame, after the loop above has
     decided which cars are drawn (see TW / twUpdate) */
  twUpdate();
+ /* the traffic bodies are instanced now, so they have to be told where their cars
+    are - once per frame, after the loop above has decided which cars are drawn */
+ tbUpdate();
 
  /* traffic + gate wheels should also spin when not playing */
  if(state!=='play'){
