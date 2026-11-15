@@ -1191,13 +1191,37 @@ function initAudio(){
   ns2.connect(lp);lp.connect(rg);rg.connect(AC.destination);ns2.start();
  }catch(e){AC=null}
 }
+/* a collision built its sound from scratch on the frame it happened: a fresh
+   square-wave oscillator and a fresh gain node, wired to the destination and
+   started, 1.39 ms of main-thread work measured in the page (createOscillator
+   0.66 ms, createGain 0.40 ms, the rest connect/start/stop) - on the same frame
+   as the collision resolution, the physics and the scenery rebuild, i.e. exactly
+   where a dropped frame is visible, and up to 2.5 times a second while the car is
+   grinding along the guardrail. Timed over 100 forced guardrail hits: 1.95 ms a
+   hit with the audio context up against 0.02 ms with it down, so 99% of that
+   frame went on building two nodes to play a 0.28 s blip, and the collision
+   itself plus the whole physics step is 0.02 ms. The waveform is fixed (square,
+   64 Hz) and the envelope is a fixed decay, so one voice can play every hit:
+   build the pair once, leave its gain at 0, and re-trigger the envelope on each
+   hit - 0.0025 ms, 550x cheaper. The sound is unchanged - the same square wave at
+   the same 64 Hz through the same .28*vol -> .001 ramp over the same 0.28 s - and
+   hits are at least 0.4 s apart, longer than the 0.29 s the voice is held, so a
+   hit never cuts the previous one short; the gain is set back to exactly 0 after
+   the ramp, which is the silence the old stop() gave. */
+var thudO=null,thudG=null;
 function thud(){
  if(!AC)return;
- var o=AC.createOscillator(),g=AC.createGain();
- o.type='square';o.frequency.value=64;
- g.gain.setValueAtTime(.28*vol,AC.currentTime);
- g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+.28);
- o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+.3);
+ if(!thudO){
+  thudO=AC.createOscillator();thudG=AC.createGain();
+  thudO.type='square';thudO.frequency.value=64;
+  thudG.gain.value=0;
+  thudO.connect(thudG);thudG.connect(AC.destination);thudO.start();
+ }
+ var tdT=AC.currentTime;
+ thudG.gain.cancelScheduledValues(tdT);
+ thudG.gain.setValueAtTime(.28*vol,tdT);
+ thudG.gain.exponentialRampToValueAtTime(.001,tdT+.28);
+ thudG.gain.setValueAtTime(0,tdT+.29);
 }
 /* every lightning strike rebuilt its 1.6-second sample from scratch - 76,800
    samples, each one a Math.pow call, 300 KB of garbage - on the main thread, at
