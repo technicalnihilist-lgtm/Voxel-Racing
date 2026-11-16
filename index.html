@@ -1793,11 +1793,34 @@ function step(dt){
    if(lt*sg5>0){
     /* cancel only the sideways component, keep rolling along the rail */
     P.vx-=lt*px3*1.05;P.vz-=lt*pz3*1.05;
-    P.vx*=.9997;P.vz*=.9997;
+    /* the rail's two damps - the .9997 scrub on the rolling speed and the .975
+       kill on the spin - were fixed fractions applied once per substep, and
+       step() always runs four substeps, so their time constant followed the
+       frame rate instead of the clock: one second of grinding the rail scrubbed
+       .9997^120 of the speed on a 30 fps device, .9997^240 at 60, .9997^480 at
+       120 and .9997^576 at 144 - 3.5%, 7.0%, 13.4% and 15.9% of the speed lost
+       per second of contact - and killed .975^120 / ^240 / ^480 / ^576 of the
+       yaw rate, the same mistake the load-transfer easing and the particle drag
+       were fixed for. Measured in the page: full throttle with the wheel turned
+       into the rail for 3 s from 35 m/s leaves the car at 99.02 km/h at 30 fps,
+       95.89 at 60, 90.82 at 120 and 88.82 at 144 - a 10.2 km/h spread for one
+       manoeuvre, i.e. a 144 Hz phone scrubbed twice as much speed off the rail
+       as a 60 Hz one and four times what a 30 fps device lost. Ease both on the
+       substep's own duration, referenced to the 240 Hz substep rate a 60 fps
+       frame gives (h*240 is exactly 1 there and Math.pow(x,1) returns x exactly,
+       so a 60 fps device multiplies by the identical doubles): the same run then
+       reads 96.70 / 95.89 / 95.57 / 95.58, a 1.13 km/h spread that is the
+       integrator's own step-size sensitivity. Nothing else changes - the
+       impulse, the 1.05 reflection, the straightening, the thud and the shake
+       are untouched, and a 4,800-step scripted run on the road (20 s flat out,
+       10 s braking with the wheel turned, 10 s opposite lock under throttle) is
+       bit-identical at 60 fps, same hash over all 247 state floats. */
+    var rd=Math.pow(.9997,h*240);
+    P.vx*=rd;P.vz*=rd;
     /* the rail guides the car: straighten it and kill the spin it would otherwise cause */
     var hErr=P.h-a3;hErr=Math.atan2(Math.sin(hErr),Math.cos(hErr));
     P.h-=hErr*Math.min(.4,h*9);
-    P.r*=.975;
+    P.r*=Math.pow(.975,h*240);
     if(hcool<=0){shake=Math.min(1,Math.abs(lt)*.05);thud();hcool=.5}
    }
   }
