@@ -1630,7 +1630,25 @@ function setQ(v){
  for(var j=0;j<bs.length;j++)bs[j].classList.toggle('sel',bs[j].getAttribute('data-q')===q);
  resizeView();curK=-1e9;rebuild(Math.floor(P.z/4));
 }
-addEventListener('resize',resizeView);
+/* the resize handler ran the whole of resizeView() for every resize *event*, and
+   one call is not free: measured in the page it is 0.307 ms of main-thread work,
+   and - the part that costs more - it re-sizes rtA, rtB and rtC, and three's
+   WebGLRenderTarget.setSize() calls dispose() whenever the size differs from the
+   last one, which during a drag it always does. So each event threw away three
+   framebuffers and the next render allocated three new ones. A desktop window
+   drag fires 60-120 resize events a second: 180-360 framebuffer allocations a
+   second and 18-37 ms of the main thread, for a size only the *last* event's
+   matters, because the canvas is CSS-sized to the window and every intermediate
+   size is on screen for less than one frame. Coalesce the burst instead: the
+   handler only raises a flag, and the loop applies it once, at the top of the
+   next frame, before that frame is built - so the last size still wins and it is
+   applied before the render that shows it, which is exactly where the
+   synchronous version left it. A single event (a phone rotating, a zoom, a
+   monitor change) is unchanged: it is applied on the next frame, 16 ms later,
+   and rAF never stops running while the page is visible. resizeView() itself is
+   untouched, and setQ() still calls it directly. */
+var rzQ=0;
+addEventListener('resize',function(){rzQ=1});
 document.addEventListener('visibilitychange',function(){
  if(document.hidden){
   if(state==='play'||state==='count')pause();
@@ -2092,6 +2110,9 @@ function hud(){
 function loop(ts){
  requestAnimationFrame(loop);
  if(document.hidden)return;
+ /* a window that was resized since the last frame gets its new size here, once,
+   before anything is drawn at the old one (see the resize listener) */
+ if(rzQ){rzQ=0;resizeView()}
  /* the rotate-to-landscape prompt is an opaque full-screen div (`#rot`, z-index
     9, #05080f), and the loop knew nothing about it: a phone held upright went on
     building and submitting the whole frame behind it. Measured in the page at
