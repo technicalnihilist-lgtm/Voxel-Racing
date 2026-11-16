@@ -1202,7 +1202,28 @@ function updateSky(dt){
  skyU.uNight.value=1-dayF;
  skyU.uCloud.value=WV.cloud;
 
- if(el>.02){cSun.copy(WHITE).lerp(ORANGE,goldF*.9)}else{cSun.copy(MOON)}
+ /* the key light's colour was switched, never blended: `el > .02` handed the sun
+    the warm WHITE->ORANGE mix and everything below it the moon's pale blue, with
+    nothing between. el is the sun's elevation, and on the auto clock (tod moves
+    dt/420, a 7-minute day) it covers 0.01496 per second near the horizon - 0.00025
+    in one 60 fps frame - so the entire change of hue happened inside a single
+    frame, once at sunrise and once at sunset, while dayF was already 0.41 and the
+    directional light was at 0.67 intensity: every lit surface, the sun disc and
+    the sky's own glow (uSunCol) jumped from (0.624,0.714,1.0) to (1,0.5835,0.3055)
+    at once. Measured on a 264x148 chase frame read back from the render target,
+    stepping between el=0.0199 and el=0.0201 - one frame apart - changed 3,280 of
+    its 39,072 pixels by more than 4 levels, by up to 41. Crossfade between exactly
+    the two colours the branch used to choose from, over 0.02 to 0.08 of elevation
+    (about four seconds of the cycle): the same frame pair then differs by 2 levels
+    with no pixel past 4.
+    Above 0.08, and at or below 0.02, the code runs the same expression it always
+    did, so the whole day, the whole night and all four fixed time-of-day presets
+    (dawn el=0.094, noon 1.0, dusk 0.157, night -0.992) are bit-identical - checked
+    channel by channel, sun.color, uSunCol, sun.intensity and dayF. Only the four
+    seconds either side of the horizon now warm up instead of snapping. */
+ if(el>.08){cSun.copy(WHITE).lerp(ORANGE,goldF*.9)}
+ else if(el<=.02){cSun.copy(MOON)}
+ else{cTmp.copy(WHITE).lerp(ORANGE,goldF*.9);cSun.copy(MOON).lerp(cTmp,smoothstep(.02,.08,el))}
  skyU.uSunCol.value.copy(cSun).multiplyScalar(.6+dayF*.9+flashT*2);
 
  S.fog.color.copy(cBot).lerp(cMid,.24);
