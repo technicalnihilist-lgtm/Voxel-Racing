@@ -2001,6 +2001,8 @@ function tEff(t){
 }
 var cdT=0,cdStep=-1,cdStart=0;
 function newGame(){
+ /* drop the outgoing race's GO! banner timer, or it fires into this countdown */
+ clearTimeout(bigT);bigT=0;
  P.z=0;P.x=cx(0);P.h=ang(0);P.vx=P.vz=P.r=0;
  gear=0;tt=0;cz=800;cps=0;ch=P.h;shiftT=0;spin=0;shake=0;skidI=0;skidDist=0;pausedCount=0;
  /* the countdown never calls step(), so every derived bit of state kept the
@@ -2029,6 +2031,19 @@ function msg(s){
  var m=$('msg');m.textContent=s;m.style.opacity=1;
  clearTimeout(msg.t);msg.t=setTimeout(function(){m.style.opacity=0},1500);
 }
+/* the GO! banner is cleared by a 600 ms timer that nothing owned. Every other
+   timer in the game is either stored and cancelled (`msg`) or guarded against
+   the state it fires into (the thunder clap), but this one was fired and
+   forgotten - so a race restarted within 600 ms of the lights going out had its
+   own countdown wiped by the previous race's timer: the first digit appears on
+   the restart's first count frame, and the stale callback then sets the banner
+   to '' and its opacity to 0 while the countdown is still in its first second,
+   leaving the 3-2-1 blank from ~0.2 s until cs reaches 1 (measured in the page:
+   restart 10 frames after GO!, banner text '3' at opacity 1, then '' at opacity
+   0 with cdT 0.18 and cdStep 0, i.e. no digit for the next 0.82 s). Keep the
+   handle and cancel it where a new countdown starts; the banner a running race
+   clears at 600 ms is untouched. */
+var bigT=0;
 function big(s,op){
  var b=$('big');b.textContent=s;b.style.opacity=op===undefined?1:op;
 }
@@ -2177,7 +2192,7 @@ function loop(ts){
   if(cs!==cdStep){
    cdStep=cs;
    if(cs<3)big(String(3-cs),1);
-   else{big('GO!',1);setTimeout(function(){big('',0)},600);state='play'}
+   else{big('GO!',1);bigT=setTimeout(function(){bigT=0;big('',0)},600);state='play'}
   }
  }
  if(state==='play'){lastA=step(dt)}
