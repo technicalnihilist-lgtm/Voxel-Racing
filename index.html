@@ -852,13 +852,26 @@ function tbUpdate(){
     tail of the list (setQ: on = i < c.tr), so the instance range stops at the last
     car that is on - the switched-off ones would only submit degenerate vertices */
  var nOn=0;while(nOn<TR.length&&TR[nOn].on)nOn++;
- for(j=0;j<TR.length;j++){
+ /* count=nOn stops the extra cars being *drawn*, but the loop still composed and
+    wrote a matrix for every one of them, and needsUpdate then re-uploaded the
+    whole buffer: on the Low preset (3 of 7 cars) that is 4 cars x 9 parts = 36 of
+    the 63 matrix writes a frame, and 64 of the 112 floats per part, spent on
+    instances the draw range cannot reach. Write - and upload - only the slots
+    that are drawn. A car past nOn has `on` false, which is what made it ZM here,
+    so the instances dropped are exactly the zero-area ones. */
+ for(j=0;j<nOn;j++){
   t=TR[j];
   tbE.set(0,t.g.rotation.y,0);tbQ.setFromEuler(tbE);
   tbC.compose(t.g.position,tbQ,tbS);
   for(i=0;i<TB.length;i++)TB[i].setMatrixAt(j,t.g.visible?tbC:ZM);
  }
- for(i=0;i<TB.length;i++){TB[i].count=nOn;TB[i].instanceMatrix.needsUpdate=true}
+ for(i=0;i<TB.length;i++){
+  var ba=TB[i].instanceMatrix;
+  TB[i].count=nOn;
+  if(nOn>0&&nOn*16<ba.array.length){ba.updateRange.offset=0;ba.updateRange.count=nOn*16}
+  else{ba.updateRange.offset=0;ba.updateRange.count=-1}
+  ba.needsUpdate=true;
+ }
 }
 
 /* the traffic wheels, one instanced mesh per material (see TW above). The two
@@ -918,7 +931,18 @@ var twQ=new T.Quaternion(),twE=new T.Euler(),twSc=new T.Vector3(1.5,1.5,1.5),twC
    traffic loop has accumulated in t.g.wr. A car hidden by the fog cull gets its
    four instances zeroed, which is what hiding its group did. */
 function twUpdate(){
- for(var i=0;i<TR.length;i++){
+ /* the wheels of a traffic car are four instances of each of three meshes, laid
+    out as base = 4 * car index, and the cars a preset switches off are always the
+    tail of the list - the same rule tbUpdate() already trims the bodies with. The
+    wheels were never trimmed: all 28 instances were submitted on every preset, so
+    on Low (3 of 7 cars) 16 of them - 57% of the traffic's wheel geometry - were
+    degenerate, and their matrices were composed, written and uploaded every frame
+    only to be discarded by the vertex stage. Stop the loop at the last car that is
+    on and set the draw range to match; a car past nOn is invisible (setQ hides it)
+    and its four slots held ZM, so nothing that was drawn changes. A fog-hidden car
+    is *inside* the range and still gets its ZM, exactly as before. */
+ var nOn=0;while(nOn<TR.length&&TR[nOn].on)nOn++;
+ for(var i=0;i<nOn;i++){
   var t=TR[i],vis=t.g.visible,base=t.g.twb;
   if(vis){
    twE.set(0,t.g.rotation.y,0);twQ.setFromEuler(twE);
@@ -936,7 +960,17 @@ function twUpdate(){
    twT.multiply(twOM);twDisc.setMatrixAt(k,twT);
   }
  }
- twTire.instanceMatrix.needsUpdate=true;twRim.instanceMatrix.needsUpdate=true;twDisc.instanceMatrix.needsUpdate=true;
+ var wc=nOn*4;
+ twTire.count=wc;twRim.count=wc;twDisc.count=wc;
+ twUp(twTire);twUp(twRim);twUp(twDisc);
+}
+/* upload only the slots inside the draw range - the same floats, in the same
+   order, for the instances that are actually submitted */
+function twUp(m){
+ var a=m.instanceMatrix;
+ if(m.count>0&&m.count*16<a.array.length){a.updateRange.offset=0;a.updateRange.count=m.count*16}
+ else{a.updateRange.offset=0;a.updateRange.count=-1}
+ a.needsUpdate=true;
 }
 
 /* checkpoint gate */
