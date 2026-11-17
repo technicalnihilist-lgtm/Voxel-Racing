@@ -1417,7 +1417,22 @@ function thud(){
    the mix already follows this rule everywhere else, and no new strike can be
    scheduled while hidden because the flash trigger lives in the render loop. */
 function thunder(){
- if(!AC||document.hidden)return;
+ /* the clap was the only sound in the game that did not follow the mix's own
+    audibility rule. audio() zeroes the engine, tyre and rain gains whenever the
+    race is not live (state is neither 'play' nor 'count'), and muteMix() zeroes
+    them for a hidden tab and for the portrait view, so the pause panel and the
+    main menu are silent by construction - but a clap builds its own gain node at
+    vol*.9 straight to the destination and never asked. Measured in the page with
+    the game paused: the three mix gains read exactly 0, 0, 0 and thunder() still
+    built a buffer source and a gain at 0.630 and started it, i.e. a full-volume
+    rumble over a silent pause screen. And the state at the flash says nothing
+    about the state when it fires: the clap is scheduled 0.6-1.5 s after the
+    flash, so pausing, quitting to the main menu, or switching the weather away
+    from storm inside that second still landed a clap on the panel, in the menu,
+    or in a clear sky with nothing to rumble at. Gate it on the same condition
+    audio() uses: a strike during play or the countdown is unchanged in every
+    respect - same buffer, same rate, same 320 Hz lowpass, same vol*.9 gain. */
+ if(!AC||document.hidden||(state!=='play'&&state!=='count'))return;
  if(!thunBuf){
   thunBuf=AC.createBuffer(1,AC.sampleRate*1.6,AC.sampleRate);
   var d=thunBuf.getChannelData(0);
