@@ -1695,7 +1695,30 @@ document.addEventListener('visibilitychange',function(){
  }
  /* coming back is not a slow frame - tell the frame-rate sampler in loop() to
     throw away the interval that spans the time the page was hidden */
- else visR=1;
+ else{
+  visR=1;
+  /* the audio context was only ever resumed inside initAudio(), i.e. once, on
+     the Play button - but a context does not stay running by itself. A hidden
+     or frozen page suspends it on Android, and an interrupted audio session
+     (backgrounding, a phone call, the lock screen) suspends it on iOS, where it
+     never comes back on its own. Measured in the page: after AC.suspend(), the
+     visibility handler left the state at 'suspended' and the next audio() call
+     restored the engine, tyre and rain gains exactly as it always did
+     (0.0581 / 0.0700 / 0) - into a context that is not running, so the whole
+     session stayed silent from the first tab switch or phone call until the
+     page was reloaded, with no way back short of a refresh. Resume it when the
+     page becomes visible again, which is the one moment the game knows the user
+     is back: the same context, the same graph, the same gains. A context that
+     is already running is not touched (nothing is called, so nothing changes),
+     a closed one cannot be resumed, and the promise is caught - resume() rejects
+     when the browser wants a fresh gesture, and an uncaught rejection would be
+     the only thing this could add to the console. initAudio() is unchanged and
+     still does the first unlock from the Play gesture. */
+  if(AC&&AC.state!=='running'&&AC.state!=='closed'&&AC.resume){
+   var apv=AC.resume();
+   if(apv&&apv.catch)apv.catch(function(){});
+  }
+ }
 });
 
 /* ---------------- physics ---------------- */
