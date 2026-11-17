@@ -1267,7 +1267,21 @@ function updateSky(dt){
  var farBase=(Q[q].n-12)*4*.95;
  S.fog.far=farBase*WV.fogF;
  S.fog.near=S.fog.far*.18;
- C.far=farBase+120;C.updateProjectionMatrix();
+ /* updateSky() runs before the camera is placed, and it rebuilt the camera's
+    projection matrix every frame after writing C.far - but the projection also
+    depends on C.fov, which is chosen further down the same frame in the camera
+    block (52 in the menu, 78 on the hood cam, 62 + up to 14 with speed on the
+    chase cams), and that block ends with its own updateProjectionMatrix() that
+    runs unconditionally in every state. So this rebuild's result was always
+    overwritten before anything was rendered: in three r128 a perspective
+    updateProjectionMatrix() is a Math.tan, a makePerspective() and a full 4x4
+    projectionMatrixInverse.invert() - measured at 2.29 us a call in the page -
+    spent every frame on a matrix nobody read. C.far still lands in the matrix,
+    because the single rebuild at the end of the frame reads it after this
+    line, so the frustum, the fov, the depth range and the picture are exactly
+    what they were; the far plane is applied one call later than before, and
+    no draw happens in between. */
+ C.far=farBase+120;
 
  var sunI=(.12+1.35*dayF)*WV.sun+flashT*1.4;
  sun.intensity=sunI;
