@@ -1919,7 +1919,24 @@ function step(dt){
      contacts on the outside of a curve. Compare the lateral offsets from each
      car's own centre line instead; the box, the impulses and the thresholds are
      untouched. */
-  var dz=P.z-t.z,dx=(P.x-cx(P.z))-t.lane;
+  /* the lateral half of that box was still the last measurement in the physics
+     taken in world axes on a road that curves. Traffic cars are placed at
+     cx(t.z)+lane (a world-x offset) and the player at cx(P.z)+off/cos(ang) (an
+     across-road offset divided back out), so the difference of the two world-x
+     offsets is not the gap between the two cars: the player's term is inflated
+     by 1/cos(a) and the traffic term is not, and the drawn gap across the road
+     is off - lane*cos(a). Measured on a drive through the bends, the gap this
+     test computed differed from the gap the two shells are drawn at by up to
+     1.37 m (near the rail on the sharpest bend) and by up to 0.38 m in the zone
+     that decides a contact - 0.26 m at the 24 deg bends the road spends most of
+     its time on - so a car you were drawing level with was up to 0.38 m nearer
+     than the box believed, and the box fired either early or late by that much.
+     Measure the player's offset across the road, the way the guardrail, the
+     on-road test and the side-contact impulse already do, and compare it with
+     the lane the car is drawn in. At ang=0 cos=1 and the expression is the one
+     it always was; the box, the thresholds, the impulses and every scale are
+     untouched. */
+  var dz=P.z-t.z,dx=(P.x-cx(P.z))*Math.cos(ang(P.z))-t.lane;
   if(Math.abs(dx)<2.9&&Math.abs(dz)<6.9){
    /* the contact box is 5.8 wide by 13.8 long, and every contact used to be
       pushed out along z - the 13.8 m axis - whatever the overlap was. Passing a
@@ -1955,7 +1972,11 @@ function step(dt){
     /* side contact: separate across the width axis and cancel the speed that
        was closing on the other car, so a passing car shrugs you off sideways */
     var sgx=dx>0?1:-1;
-    P.x=cx(P.z)+t.lane+sgx*2.9;
+    /* dx is now the across-road gap, so the car has to be put back the same way:
+       the separation is 2.9 m across the road, which is 2.9/cos(a) in world x.
+       The angle is the one the impulse below already computes. */
+    var a5=ang(P.z),ca5=Math.cos(a5),sa5=Math.sin(a5);
+    P.x=cx(P.z)+(t.lane+sgx*2.9)/ca5;
     /* the speed closing on the other car is the one *across* the road, and this
        read it off world x. The road curves: a car simply following it at 40 m/s
        through the sharpest bend (-26.9 deg, z=7117) carries vx = -18.1 m/s while
@@ -1970,7 +1991,6 @@ function step(dt){
        guardrail and the on-road test already do. At ang=0 the pair is (1,0), so
        a straight road is bit-identical; the box, the thresholds, the 1.05
        reflection and the yaw/shake scales are untouched. */
-    var a5=ang(P.z),ca5=Math.cos(a5),sa5=Math.sin(a5);
     var lv=(P.vx*ca5-P.vz*sa5)*sgx;
     if(lv<0){
      var lc=1.05*lv*sgx;
@@ -2031,7 +2051,10 @@ function spawn(t){
    if(o.lane===t.lane&&Math.abs(o.z-t.z)<9){ok=0;break}}
   if(ok)break;
  }
- t.g.position.set(cx(t.z)+t.lane,.1,t.z);t.g.rotation.y=ang(t.z)}
+ /* the same across-road lane offset the traffic loop uses (see there), so a car
+    is already sitting in its lane before the lights go out */
+ var sa0=ang(t.z),ca0=Math.cos(sa0);
+ t.g.position.set(cx(t.z)+t.lane/ca0,.1,t.z);t.g.rotation.y=sa0}
 /* a car has to ease off for the speed the car ahead is really making, not the
    speed it would like to make. The car ahead may itself be held up behind a
    third car, and reading its nominal v let a three-car queue collapse into the
@@ -2287,7 +2310,19 @@ function loop(ts){
    t.z+=tv*dt;
    if(t.z<P.z-50||t.z>P.z+480)spawn(t);
    var ta=ang(t.z),tca=Math.cos(ta);
-   t.g.position.set(cx(t.z)+t.lane,.1,t.z);
+   /* a traffic car's lane offset was added straight to its world x, but the lanes
+      run along each segment's normal (rebuild() lays the tarmac, the shoulder and
+      the rail at x + s*d*cos(a), z - s*d*sin(a)), so the offset across the road
+      was only lane*cos(a): every traffic car sat inside its own lane on every
+      bend - 0.26 m at the 24 deg bends the road spends most of its time on,
+      0.38 m on the sharpest 29.1 deg one - drifting toward the centre line and
+      away again as the road straightened. Divide the offset back out, so a car
+      is drawn lane metres from the centre line everywhere, which is where the
+      lane it belongs to is; the contact box above now measures the same way.
+      tca is the cosine already computed for the car's yaw, and at ang=0 it is 1,
+      so a straight is unchanged. Only x moves - z, yaw, speed, the wheel roll
+      and every threshold are untouched. */
+   t.g.position.set(cx(t.z)+t.lane/tca,.1,t.z);
    t.g.rotation.y=ta;
    /* the traffic wheels are the same .41-radius wheel scaled 1.5 as the player's,
       so they must roll at v/.6 where v is the speed the car is actually covering
