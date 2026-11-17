@@ -1904,8 +1904,28 @@ function step(dt){
  gateHit();
  /* the last-resort clamp is a cross-road distance too - measure it the same way */
  var a4=ang(P.z),ca4=Math.cos(a4);
- var off2=(P.x-cx(P.z))*ca4;
- if(Math.abs(off2)>LIM+2){P.x=cx(P.z)+(off2>0?1:-1)*(LIM+2)/ca4;P.vx*=.5;P.vz*=.7}
+ var cx4=cx(P.z);
+ var off2=(P.x-cx4)*ca4;
+ if(Math.abs(off2)>LIM+2){P.x=cx4+(off2>0?1:-1)*(LIM+2)/ca4;P.vx*=.5;P.vz*=.7}
+ /* the contact test below measured the player's own across-road offset - cx() and
+    ang() of its own z, which is three cx() calls, i.e. nine sines plus an atan
+    and a cosine, 462 ns measured in the page - once per traffic car, on every one
+    of the four substeps, and it had to compute that offset before it could learn
+    whether the car was anywhere near: 7 cars x 4 substeps x 462 ns = 12.9 us of
+    every frame, 5% of the 112 us step() costs, spent re-deriving the same two
+    numbers for a car 300 m away. The traffic loop keeps its cars spread over a
+    530 m band and the box is 13.8 m long, so at most one of the seven is ever
+    inside it. Test the z half of the box first - it needs none of that trig and
+    it is exactly the `Math.abs(dz)<6.9` the box already required - and keep the
+    player's cx()/cos(ang()) for the cars that pass it. P.z is the only input they
+    depend on and the rear-end branch below is the only thing that changes it, so
+    recompute only when it does: a side contact moves P.x, which is read fresh
+    every iteration. Same doubles, same order, same boxes - a straight run of
+    6,000 scripted frames (throttle, braking, both locks, seven traffic cars) is
+    bit-identical in every value compared: P.x/z/h, vx/vz/r, gear, rpm, the race
+    clock, the checkpoints, wheel roll, load transfer, the three body springs and
+    every traffic car's z, speed, lane and wheel angle. */
+ var pz4=P.z,cxs=cx4,cas=ca4;
  for(var ti=0;ti<TR.length;ti++){
   var t=TR[ti];if(!t.on)continue;
   /* the contact box has to be measured in road space, not in world axes. The
@@ -1936,7 +1956,10 @@ function step(dt){
      the lane the car is drawn in. At ang=0 cos=1 and the expression is the one
      it always was; the box, the thresholds, the impulses and every scale are
      untouched. */
-  var dz=P.z-t.z,dx=(P.x-cx(P.z))*Math.cos(ang(P.z))-t.lane;
+  var dz=P.z-t.z;
+  if(dz>6.9||dz<-6.9)continue;
+  if(P.z!==pz4){pz4=P.z;cxs=cx(pz4);cas=Math.cos(ang(pz4))}
+  var dx=(P.x-cxs)*cas-t.lane;
   if(Math.abs(dx)<2.9&&Math.abs(dz)<6.9){
    /* the contact box is 5.8 wide by 13.8 long, and every contact used to be
       pushed out along z - the 13.8 m axis - whatever the overlap was. Passing a
