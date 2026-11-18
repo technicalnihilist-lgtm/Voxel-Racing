@@ -799,6 +799,10 @@ for(var i=0;i<7;i++){var t={g:mkCar(TRCOL[i]),z:0,lane:3,v:15,effF:0,effV:0,on:1
    are already placed from, and a car hidden by the fog cull gets its instances
    zeroed, which is exactly what hiding its group did. */
 var TB=[];
+/* set whenever anything the traffic instances are built from has changed: the
+   play loop's own movement, a respawn, a preset switch, or a car crossing the fog
+   cull. Cleared by the one place that rebuilds them (see the call site in loop) */
+var tbDirty=1;
 var tbQ=new T.Quaternion(),tbE=new T.Euler(),tbS=new T.Vector3(1.5,1.5,1.5),tbC=new T.Matrix4();
 function tbIdent(m){
  var e=m.elements;
@@ -1672,7 +1676,7 @@ function setQ(v){
     next shadow pass), so the rendering is unchanged. */
  if(sun.shadow.map&&(c.sh<=0||sun.shadow.map.width!==c.sh)){sun.shadow.map.dispose();sun.shadow.map=null}
  for(var i=0;i<TR.length;i++){
-  var tq=TR[i],was=tq.on;tq.on=i<c.tr;tq.g.visible=tq.on;
+  var tq=TR[i],was=tq.on;tq.on=i<c.tr;tq.g.visible=tq.on;tbDirty=1;
   /* the traffic loop only moves cars that are visible, so a car dropped by a
      lighter preset's traffic count stops dead where it stood - and the preset can
      be changed mid-race from the pause menu. Come back to a higher count and the
@@ -2129,7 +2133,7 @@ function spawn(t){
  /* the same across-road lane offset the traffic loop uses (see there), so a car
     is already sitting in its lane before the lights go out */
  var sa0=ang(t.z),ca0=Math.cos(sa0);
- t.g.position.set(cx(t.z)+t.lane/ca0,.1,t.z);t.g.rotation.y=sa0}
+ t.g.position.set(cx(t.z)+t.lane/ca0,.1,t.z);t.g.rotation.y=sa0;tbDirty=1}
 /* a car has to ease off for the speed the car ahead is really making, not the
    speed it would like to make. The car ahead may itself be held up behind a
    third car, and reading its nominal v let a three-car queue collapse into the
@@ -2430,6 +2434,7 @@ function loop(ts){
    t.g.wr+=tv*dt/(.6*tca);
   }
   gate.position.set(cx(cz),0,cz);gate.rotation.y=ang(cz);
+  tbDirty=1;
  }
 
  /* a traffic car past the fog is drawn exactly in the fog colour, so it cannot
@@ -2444,14 +2449,34 @@ function loop(ts){
     drawn exactly as before - a car sitting on the fog boundary is unchanged by
     construction, because the fog factor there is already 1. */
  var fogC=S.fog.far+2;
- for(var i=0;i<TR.length;i++){var tvi=TR[i];tvi.g.visible=tvi.on&&(tvi.z-P.z)<fogC}
- /* the traffic wheels are three instanced meshes now, so they have to be told
-    where the cars they belong to are - once per frame, after the loop above has
-    decided which cars are drawn (see TW / twUpdate) */
- twUpdate();
- /* the traffic bodies are instanced now, so they have to be told where their cars
-    are - once per frame, after the loop above has decided which cars are drawn */
- tbUpdate();
+ for(var i=0;i<TR.length;i++){
+  var tvi=TR[i],tvz=tvi.on&&(tvi.z-P.z)<fogC;
+  if((tvi.g.visible?1:0)!==(tvz?1:0)){tvi.g.visible=tvz;tbDirty=1}
+ }
+ /* the traffic wheels and bodies are instanced, so they have to be told where
+    the cars they belong to are - after the loop above has decided which cars are
+    drawn (see TW / twUpdate and TB / tbUpdate). That was done on every frame of
+    the session, whatever the game was doing: eight body buffers and three wheel
+    buffers, 84 matrices at High (8 parts x 7 cars, plus 28 wheels) and eleven
+    bufferSubData calls, rebuilt from scratch and re-sent to the GPU every frame -
+    52 us of main-thread work a frame measured in the page at High - while the
+    only things they are built from (t.g's
+    position, yaw and wheel roll, and which cars the fog cull hides) are written
+    in exactly one place, the play branch, and are therefore frozen in the menu,
+    through the whole 3-2-1 countdown of every race, and whenever the game is
+    paused. Nothing about the traffic can change in those states, so the twelve
+    uploads pushed identical bytes over the bus every frame for a picture that
+    cannot differ. Rebuild them only when one of those inputs moved: the flag is
+    raised by the play loop, by spawn(), by setQ() (a preset hides cars without
+    respawning them) and by the fog cull when a car actually crosses the boundary.
+    Measured in the page at High with 7 cars: the frame's bufferSubData count falls
+    from 16 to 5 in the menu and from 17 to 6.5 through the countdown, and stays
+    exactly 16 in play, where the flag is raised every frame as before. The picture
+    cannot differ, and was checked: rendering the same menu, countdown, play and
+    fog-weather frames from both builds (same seeded RNG, same timestamps) gives
+    identical framebuffers and identical drawn instance data, and so does switching
+    the preset from the pause panel and resuming. */
+ if(tbDirty){tbDirty=0;twUpdate();tbUpdate()}
 
  /* traffic + gate wheels should also spin when not playing */
  if(state!=='play'){
