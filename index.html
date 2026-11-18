@@ -910,6 +910,11 @@ function pwIM(g,m){var o=new T.InstancedMesh(g,m,4);o.frustumCulled=false;o.inst
 var pwTire=pwIM(gTire,mTire),pwRim=pwIM(gRimSpokes,twRimMat),pwDisc=pwIM(gDisc,twDiscMat),pwCal=pwIM(gCal,pwCalMat);
 for(var pwi=0;pwi<4;pwi++){pwTire.setMatrixAt(pwi,ZM);pwRim.setMatrixAt(pwi,ZM);pwDisc.setMatrixAt(pwi,ZM);pwCal.setMatrixAt(pwi,ZM)}
 var pwQ=new T.Quaternion(),pwE=new T.Euler(),pwSc=new T.Vector3(),pwPos=new T.Vector3(),pwCM=new T.Matrix4(),pwPM=new T.Matrix4(),pwSM=new T.Matrix4(),pwW=new T.Matrix4(),pwO=new T.Matrix4();
+/* set whenever anything the player's wheel instances are built from has changed:
+   the play branch of loop() (P.h, wr), the countdown branch (the front pair's
+   steering angle dlt) and setCar(). Cleared by the one place that rebuilds them
+   (see the call site in loop) */
+var pwDirty=1;
 function pwUpdate(){
  var list=car.pw;if(!list)return;
  pwE.set(0,P.h,0);pwQ.setFromEuler(pwE);pwSc.setScalar(1.5);
@@ -1622,6 +1627,8 @@ function setCar(idx){
  var o=[0xc0161b,0xff7a00,0xf5c000,0x0d0d10][idx];
  car=idx?mkP1(o,1,idx===3):mkCar(o,1);
  S.add(car);
+ /* the wheel instances are driven from car.pw, so a new model needs them rebuilt */
+ pwDirty=1;
  var bs=document.querySelectorAll('[data-car]');
  for(var i=0;i<bs.length;i++)bs[i].classList.toggle('sel',+bs[i].getAttribute('data-car')===idx);
 }
@@ -2372,7 +2379,7 @@ function loop(ts){
     position stay bit-identical - only the angle drawn during the countdown moves,
     and it now matches the angle drawn on the first play frame instead of snapping
     to it. */
- else if(state==='count'){th+=((I.g?1:0)-th)*Math.min(1,dt*8);erpm=1000+th*4200;st+=((I.r-I.l)-st)*Math.min(1,dt*7);dlt=-st*.46}
+ else if(state==='count'){th+=((I.g?1:0)-th)*Math.min(1,dt*8);erpm=1000+th*4200;st+=((I.r-I.l)-st)*Math.min(1,dt*7);dlt=-st*.46;pwDirty=1}
 
  if(state==='play'){
   if(P.z>cz){cps++;msg('Checkpoint '+cps+' · '+fmt(tt));cz+=800}
@@ -2434,7 +2441,7 @@ function loop(ts){
    t.g.wr+=tv*dt/(.6*tca);
   }
   gate.position.set(cx(cz),0,cz);gate.rotation.y=ang(cz);
-  tbDirty=1;
+  tbDirty=1;pwDirty=1;
  }
 
  /* a traffic car past the fog is drawn exactly in the fog colour, so it cannot
@@ -2628,8 +2635,25 @@ function loop(ts){
  car.b.position.y=bp+Math.sin(tt*60)*shake*.05;
  /* the player's four wheels are four instances of four shared meshes (see
     pwUpdate): the same matrices the group chain used to compose, written in one
-    call instead of sixteen meshes' worth of scene-graph updates */
- pwUpdate();
+    call instead of sixteen meshes' worth of scene-graph updates.
+    That call was made on every frame of the session, whatever the game was
+    doing: four instance matrices composed through four Matrix4 chains, written
+    into four instanceMatrix buffers and marked for upload - but every number
+    they are built from (P.h, dlt, wr and the car's position) is written in
+    exactly two places, the play branch above and the countdown branch that
+    steers the front pair, and is therefore frozen in the main menu and behind
+    the pause panel, where the car is a stationary display piece. Nothing about
+    the wheels can change in those states, so the four uploads pushed identical
+    bytes over the bus every frame for a picture that cannot differ. Counted in
+    the page with the WebGL context wrapped: the menu and the pause panel each
+    spend 5 bufferSubData and 1.64 KB a frame, and 4 of those calls (1 KB) are
+    these wheels - more than half of the bus traffic of a screen where nothing
+    moves but the clouds. Rebuild them only when one of those inputs moved: the
+    flag is raised by the play branch, by the countdown branch and by setCar().
+    In play and through the whole 3-2-1 the flag is raised every frame, exactly
+    as before, and in the menu and the pause panel the matrices left in the
+    buffers are the ones that frame would have written. */
+ if(pwDirty){pwDirty=0;pwUpdate()}
  if(car.tail)car.tail.emissiveIntensity=braking?2.6:.2+ (WV.wet>.4?.5:0);
  if(car.glass)car.glass.opacity=.5+ (1-dayF)*.18;
 
