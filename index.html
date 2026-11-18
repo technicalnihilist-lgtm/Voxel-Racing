@@ -1220,7 +1220,22 @@ function snapShadow(){
 var WHITE=new T.Color(0xfff6e6),ORANGE=new T.Color(0xff8a3d),MOON=new T.Color(0x9fb6ff);
 
 function updateSky(dt){
- if(todMode==='auto'){tod=(tod+dt/420)%1}
+ /* the day/night clock was the one piece of world time pause() did not stop.
+    `tt`, the countdown and the whole physics freeze behind the pause panel, and
+    the visibility handler stops the loop outright for a hidden tab - but tod kept
+    advancing on the frame's own dt, and tod is what drives the sun's elevation,
+    every sky colour, the sun/moon colour, the streetlamps' emissive and the
+    environment map the car reflects. The day is 420 s long, so a 30 s pause moved
+    the sun 30/420 = .0714 of a full cycle, 25.7 deg of elevation: pause at noon,
+    take a call, and the race resumes at mid-afternoon with the lamps lit and the
+    shadows swung round - all of it visible through the panel (`.ov` is
+    rgba(4,7,14,.55) over the live canvas, not an opaque screen). A ten-minute
+    pause ran the cycle 1.43 times over. Freeze the clock in the pause state only:
+    in play, through the countdown and in the menu the condition is unchanged, so
+    every frame of a race is bit-identical, and the pause panel still follows a
+    weather or time-of-day change, because WV's easing and every colour below keep
+    running - only tod stops. */
+ if(todMode==='auto'&&state!=='pause'){tod=(tod+dt/420)%1}
  var el=Math.sin((tod-.25)*TAU);
  var horiz=Math.cos((tod-.25)*TAU);
  sunDir.set(horiz*.92,el,horiz*.34).normalize();
