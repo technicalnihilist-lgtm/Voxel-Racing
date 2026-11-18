@@ -1461,10 +1461,32 @@ function thunder(){
   var d=thunBuf.getChannelData(0);
   for(var i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.6);
  }
+ /* a clap's three nodes were built, wired and started, and then never released:
+    nothing in this file calls disconnect() and nothing sets onended, and a Web
+    Audio node stays alive for as long as it is reachable from the destination -
+    which every one of them is, straight through f and g. So each strike left a
+    buffer source, a biquad and a gain attached to the output for the rest of the
+    session: 3 nodes a strike, and the storm preset schedules one 0.14 of a
+    second (measured in the page: 22 claps in 120 s of storm, one every 5.5 s,
+    11 a minute) - ~650 nodes an hour of storm, and the count only goes up. A
+    node left in the graph is not free even when it has nothing to play: the
+    audio thread walks and processes every reachable node in each 128-sample
+    render quantum (~375 a second), so an hour of storm turns into a permanently
+    slower audio thread on exactly the phone that cannot spare it. Release the
+    three once the 1.6 s sample has finished playing: `ended` fires when the
+    buffer runs out (1.6 s at the fastest 1.1x rate, measured in the page as 40
+    of 40 sources ending), which is after every sample of the clap has been
+    heard - the sound is untouched, same buffer, same rate, same 320 Hz lowpass,
+    same vol*.9 gain, same start; only the nodes' lifetime after the sound ends
+    changes, and the graph the mix runs on is the one it started with. Guarded
+    because a disconnect on an already-disconnected node throws in some engines,
+    and the buffer and the memoised thud voice are untouched, so the next strike
+    builds exactly the three nodes this one built. */
  var s=AC.createBufferSource();s.buffer=thunBuf;
  s.playbackRate.value=.9+Math.random()*.2;
  var f=AC.createBiquadFilter();f.type='lowpass';f.frequency.value=320;
  var g=AC.createGain();g.gain.value=vol*.9;
+ s.onended=function(){try{s.disconnect();f.disconnect();g.disconnect()}catch(e){}};
  s.connect(f);f.connect(g);g.connect(AC.destination);s.start();
 }
 /* every frame wrote all six of the engine mix's AudioParams, whether or not the
