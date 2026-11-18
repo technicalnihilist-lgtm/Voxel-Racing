@@ -1788,7 +1788,7 @@ var MASS=1500,IZ=2400,LA=1.2,LB=1.5,LL=2.7,RW=.4,FD=3.4,GR=[3.2,2.2,1.65,1.3,1.0
 var pac=function(f,a,mu){return -f*mu*Math.sin(1.5*Math.atan(10*a))};
 var LIM=9.9,YAWK=1.5,STEERD=340,LATP=3.4;
 var P={x:0,z:0,h:0,vx:0,vz:0,r:0};
-var gear=0,erpm=1000,th=0,dlt=0,shiftT=0,spin=0,axB=0,ayB=0;
+var gear=0,erpm=1000,erpmD=1000,th=0,dlt=0,shiftT=0,spin=0,axB=0,ayB=0;
 var tt=0,wr=0,pv=0,pp=0,rv=0,rp=0,bv=0,bp=0,cz=800,cps=0,ch=0,cdist=8,shake=0,slip=0,thr=0,vfS=0,hcool=0,st=0;
 var braking=0,onRoad=1,offRoad=0;
 
@@ -2193,7 +2193,7 @@ function newGame(){
     still showed the old race's speed, and the body roll/pitch springs and the
     steering angle still had the car tilted with its front wheels turned until
     the lights went out. Start the new race from a settled car instead. */
- vfS=0;slip=0;thr=0;braking=0;dlt=0;st=0;th=0;onRoad=1;offRoad=0;hcool=0;lastA=0;
+ vfS=0;slip=0;thr=0;braking=0;dlt=0;st=0;th=0;erpmD=1000;onRoad=1;offRoad=0;hcool=0;lastA=0;
  axB=0;ayB=0;pp=0;pv=0;rp=0;rv=0;bp=0;bv=0;
  /* the skid ring buffer is rewound but its matrices still hold last race's marks,
     so those quads stayed on the road for the rest of the session; clear them all */
@@ -2265,7 +2265,7 @@ function hud(){
  v=fmt(tt);if(v!==HUDS.tm){HUDE.tm.textContent=v;HUDS.tm=v}
  v=''+Math.max(0,P.z|0);if(v!==HUDS.ds){HUDE.ds.textContent=v;HUDS.ds=v}
  v=''+cps;if(v!==HUDS.cp){HUDE.cp.textContent=v;HUDS.cp=v}
- var rpm=clamp((erpm-1000)/7200,0,1);v=(rpm*100)+'%';
+ var rpm=clamp((erpmD-1000)/7200,0,1);v=(rpm*100)+'%';
  if(v!==HUDS.tach){HUDE.tach.style.width=v;HUDS.tach=v}
  var hr=Math.floor(tod*24),mn=Math.floor((tod*24%1)*60);
  v=wName.toUpperCase()+' · '+(hr<10?'0':'')+hr+':'+(mn<10?'0':'')+mn;
@@ -2725,7 +2725,29 @@ function loop(ts){
 
  /* audio */
  var kmh=sp3*3.6;
- var rpmN=(erpm-1000)/7200;
+ /* the engine speed the tachometer draws and the engine tone is built from was the
+    instantaneous `erpm` - wheel speed x gear x final drive - so it stepped in a
+    single frame wherever `erpm` does, at the two moments a player is looking
+    straight at it. At the standing start the countdown revs the engine to 5,200 rpm
+    (erpm = 1000 + th*4200) and the first play frame recomputes it from a wheel that
+    is not turning yet and reads 1,000: measured in the page, erpm 5,200 -> 1,000
+    between one frame and the next, i.e. the tach bar 58.3% -> 0% and the sawtooth
+    from 109.1 Hz to 42.0 Hz while the throttle is held flat, so the engine fell to
+    idle at the instant of launch and then climbed again. And every automatic shift
+    moves `erpm` by a whole gear ratio at once, because it is derived from `gear`:
+    the 1 -> 2 change at 103 km/h takes it 7,380 -> 5,122 (143.9 Hz -> 107.8 Hz, tach
+    88.6% -> 57.3%) in one frame, a 30% pitch step, and the 2 -> 3 change is
+    another. Real revs take a moment to follow: ease the displayed and sounded rpm
+    toward `erpm` on the frame's own duration (14/s, so 63% of the step in 70 ms and
+    94% in 200 ms, the same wall-clock curve at any frame rate) and snap it when it
+    is within 0.5 rpm, so a steady engine still holds one constant string and one
+    constant frequency exactly as before. `erpm` itself is untouched - it still
+    drives the torque curve, the shift points, the rev limiter and the wheel roll -
+    so the physics, the balance and the gear changes are bit-identical; only the
+    tach bar and the two oscillator frequencies glide instead of stepping. */
+ if(Math.abs(erpm-erpmD)<.5)erpmD=erpm;
+ else erpmD+=(erpm-erpmD)*(1-Math.exp(-dt*14));
+ var rpmN=(erpmD-1000)/7200;
  audio(clamp(rpmN,0,1),thr,(slip>4||(I.b&&sp3>15))?slip+4:0);
  if(fr%3===0)hud();
 
