@@ -1,10 +1,10 @@
 <div align="center">
 
+<img src="assets/icon.png" width="96" height="96" alt="Single-file 3D racing game icon">
+
+<img src="assets/banner.svg" alt="Single-file 3D racing game — dynamic weather, day/night cycle, PBR graphics and an Android APK. No…">
+
 <a href="https://github.com/technicalnihilist-lgtm/Voxel-Racing/stargazers"><img src="https://img.shields.io/badge/stars-4-5A31F4?style=for-the-badge&logo=github&logoColor=white" alt="stars: 4"></a>&nbsp;<a href="https://github.com/technicalnihilist-lgtm/Voxel-Racing/network/members"><img src="https://img.shields.io/badge/forks-0-3FB950?style=for-the-badge" alt="forks: 0"></a>
-
-<h3>Single-file 3D racing game — dynamic weather, day/night cycle, PBR graphics and an Android APK. No…</h3>
-
-<img src="https://img.shields.io/badge/HTML-5865F2?style=flat-square" alt="HTML"> <img src="https://img.shields.io/badge/3D-3B3F4A?style=flat-square" alt="3D"> <img src="https://img.shields.io/badge/Android-3FB950?style=flat-square" alt="Android"> <img src="https://img.shields.io/badge/APK-EC4899?style=flat-square" alt="APK">
 
 <a href="https://github.com/technicalnihilist-lgtm/Voxel-Racing/releases/latest"><img src="https://img.shields.io/badge/DOWNLOAD-APK-6D5AE6?style=for-the-badge&logo=android&logoColor=white" alt="Download APK"></a>
 
@@ -16,13 +16,7 @@
 
 <a href="https://github.com/technicalnihilist-lgtm/Voxel-Racing/releases/latest"><img src="https://img.shields.io/badge/VERSION-v2.1-6D5AE6?style=for-the-badge" alt="VERSION: v2.1"></a> <img src="https://img.shields.io/badge/DOWNLOADS-573-3FB950?style=for-the-badge" alt="DOWNLOADS: 573"> <a href="https://github.com/technicalnihilist-lgtm/Voxel-Racing/releases"><img src="https://img.shields.io/badge/RELEASES-GITHUB-EC4899?style=for-the-badge&logo=github&logoColor=white" alt="RELEASES: GITHUB"></a>
 
-<h4>Get it from</h4>
-
-<a href="https://github.com/technicalnihilist-lgtm/Voxel-Racing/releases"><img src="https://img.shields.io/badge/GitHub-Releases-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub Releases"></a> <a href="https://github.com/technicalnihilist-lgtm/Voxel-Racing/archive/refs/heads/main.zip"><img src="https://img.shields.io/badge/Source-ZIP-0EA5E9?style=for-the-badge&logo=github&logoColor=white" alt="Source ZIP"></a>
-
 </div>
-
----
 
 ---
 
